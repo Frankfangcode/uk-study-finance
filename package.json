@@ -1,0 +1,8 @@
+{
+  "name": "uk-study-finance",
+  "private": true,
+  "description": "台灣學生赴英碩士的成本與資金試算網站模擬。靜態檔，沒有建置步驟。",
+  "scripts": {
+    "test": "node test-c-module.js && node tests/acceptance.js"
+  }
+}
