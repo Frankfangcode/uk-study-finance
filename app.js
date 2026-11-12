@@ -1,0 +1,520 @@
+(function () {
+  "use strict";
+
+  var A = window.AModule;
+  var B = window.BModule;
+  var C = window.CModule;
+  var D = window.DModule;
+  var E = window.EModule;
+  var Constants = window.SharedConstants;
+  var pages = ["a", "b", "c", "d", "e"];
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function link(url, label) {
+    if (!url) return esc(label || "");
+    return '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label || url) + "</a>";
+  }
+
+  function money(n, currency) {
+    if (n === null || n === undefined || n === "") return "—";
+    if (currency === "GBP") {
+      var gbp = Number(n);
+      if (!isFinite(gbp)) return "—";
+      return "£" + gbp.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+    }
+    var twd = Math.round(Number(n));
+    if (!isFinite(twd)) return "—";
+    return "NT$" + twd.toLocaleString("zh-Hant");
+  }
+
+  function numOrNull(value) {
+    if (value === null || value === undefined || value === "") return null;
+    var n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+
+  function paidValue() {
+    var value = $("deposit-paid").value;
+    if (value === "paid") return true;
+    if (value === "unpaid") return false;
+    return null;
+  }
+
+  function showPage(name) {
+    if (pages.indexOf(name) < 0) name = "a";
+    pages.forEach(function (page) {
+      $("page-" + page).classList.toggle("hidden", page !== name);
+    });
+    document.querySelectorAll(".nav-btn").forEach(function (btn) {
+      btn.setAttribute("aria-current", btn.getAttribute("data-page") === name ? "page" : "false");
+    });
+    if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function applyOfficialNumbers() {
+    var programme = B.buildOutput($("preset").value);
+    if (!programme || programme.tuition.amount == null) return;
+    $("tuition").value = programme.tuition.amount;
+    $("deposit").value = programme.deposit.amount;
+    $("course-months").value = programme.course_length_months;
+    $("tuition-src").innerHTML = "來源：" + link(programme.tuition.source.url, programme.tuition.source.label) + "。查閱 " + esc(programme.tuition.source.consulted) + "。";
+    $("deposit-src").innerHTML = "來源：" + link(programme.deposit.source.url, programme.deposit.source.label) + "。已含在學費裡。";
+    if (programme.key !== "glasgow") $("awarded").checked = false;
+  }
+
+  function readProgramme() {
+    var key = $("preset").value;
+    var programme = B.buildOutput(key);
+    var tuition = numOrNull($("tuition").value);
+    var deposit = numOrNull($("deposit").value);
+    var months = numOrNull($("course-months").value);
+    var tuitionEdited = tuition !== null && tuition !== programme.tuition.amount;
+    var depositEdited = deposit !== null && deposit !== programme.deposit.amount;
+    // 留空就是留空：不默默退回公告價，交給 currentCase 依「留空先不算」擋下。
+    programme._tuitionBlank = tuition === null;
+    programme._depositBlank = deposit === null;
+    programme.tuition.amount = tuition;
+    programme.deposit.amount = deposit;
+    programme.course_length_months = months;
+    if (tuitionEdited) {
+      programme.tuition.source = { label: "自訂學費", url: "", assumption: true, consulted: "2026-11-12", note: "已改過公告學費。" };
+    }
+    if (depositEdited) {
+      programme.deposit.source = { label: "自訂訂金", url: "", assumption: true, consulted: "2026-11-12", note: "已改過公告訂金。" };
+    }
+    programme._tuitionEdited = tuitionEdited;
+    programme._depositEdited = depositEdited;
+    return programme;
+  }
+
+  function currentCase() {
+    var programme = readProgramme();
+    if (programme._tuitionBlank || programme._depositBlank) {
+      return { ok: false, error: "學費或訂金留空時先不算，避免把空白當成 0，也不會默默改用公告價。要用公告價請重新選一次學程。", programme: programme };
+    }
+    var reserveInput = numOrNull($("reserve").value);
+    if (reserveInput !== null && reserveInput < 0) {
+      return { ok: false, error: "預備金比例不能是負數。不留預備金請填 0。", programme: programme };
+    }
+    var termInput = numOrNull($("term").value);
+    if (termInput !== null && termInput <= 0) {
+      return { ok: false, error: "攤還期數必須大於 0。0 期或負數算不出月付。", programme: programme };
+    }
+    var published = A.buildStudentPlan({
+      programme: programme,
+      depositPaid: paidValue(),
+      insurance: {
+        flag: $("ins-flag").value,
+        amount: numOrNull($("ins-amt").value),
+        zeroEvidence: $("ins-evidence").checked,
+      },
+      awardedWaiverGbp: $("awarded").checked && programme.scholarships && programme.scholarships.length ? programme.scholarships[0].amount_gbp : 0,
+      assumptions: {
+        fxRate: numOrNull($("fx").value),
+        reserveRate: numOrNull($("reserve").value),
+        livingMonthlyGbp: numOrNull($("living-m").value),
+        livingMonths: numOrNull($("living-months").value),
+        otherGbp: numOrNull($("other-gbp").value),
+        twdExpenses: numOrNull($("twd").value),
+        savings: numOrNull($("savings").value),
+        family: numOrNull($("family").value),
+        manualScholarshipTwd: numOrNull($("scholarship").value),
+        incomeMonthly: numOrNull($("income").value),
+        loan: {
+          annualRate: numOrNull($("rate").value),
+          termMonths: numOrNull($("term").value),
+          graceMonths: numOrNull($("grace").value),
+        },
+      },
+      tuitionAssumption: programme._tuitionEdited,
+      depositAssumption: programme._depositEdited,
+    });
+    if (numOrNull($("fx").value) === null || numOrNull($("reserve").value) === null) {
+      return { ok: false, error: "匯率或預備金留空時先不算，避免把空白當成 0。", programme: programme };
+    }
+    if (numOrNull($("savings").value) === null || numOrNull($("family").value) === null || numOrNull($("grace").value) === null) {
+      return { ok: false, error: "自備款、家庭支援或寬限期留空時先不算。若這次假設是 0，請填 0。", programme: programme };
+    }
+    if (programme.tuition.amount == null || programme.deposit.amount == null) {
+      return { ok: false, error: "學費或訂金留空時先不算，避免把空白當成 0。", programme: programme };
+    }
+    if (!published || !published.ok || !published.plan || published.plan.ok === false) {
+      return { ok: false, error: (published && published.plan && published.plan.error) || (published && published.error) || "這份方案還不能算。", programme: programme };
+    }
+    if (programme._tuitionEdited && published.plan) {
+      published.plan.lines.forEach(function (line) {
+        if (line.id === "tuition") line.assumption = true;
+      });
+    }
+    var review = E.review({ lines: published.plan.lines, scenario: published.scenario });
+    var summary = A.summarize(published, review);
+    var depositDue = D.outstanding(published.scenario, "deposit");
+    var tuitionDue = D.outstanding(published.scenario, "tuition");
+    return {
+      ok: true,
+      programme: programme,
+      published: published,
+      plan: published.plan,
+      scenario: published.scenario,
+      review: review,
+      summary: summary,
+      awards: B.awardState(programme, $("awarded").checked ? programme.scholarships.map(function (item) { return item.id; }) : []),
+      depositPay: D.compare({
+        school_id: programme.school_id,
+        fee_purpose: "deposit",
+        amount_due: depositDue.amount,
+        currency: depositDue.currency,
+        payer_country: "TW",
+        amount_basis: depositDue.basis,
+      }),
+      tuitionPay: D.compare({
+        school_id: programme.school_id,
+        fee_purpose: "tuition",
+        amount_due: tuitionDue.amount,
+        currency: tuitionDue.currency,
+        payer_country: "TW",
+        amount_basis: tuitionDue.basis,
+      }),
+      depositDue: depositDue,
+      tuitionDue: tuitionDue,
+    };
+  }
+
+  function verdictClass(verdict) {
+    if (verdict === "PASS") return "banner ok";
+    if (verdict === "轉真人") return "banner bad";
+    return "banner";
+  }
+
+  function statusTag(line, view) {
+    if (view && view.blocked) return '<span class="tag bad">不顯示</span>';
+    if (line.inclusion === "pending") return '<span class="tag pending">待確認</span>';
+    if (line.inclusion === "included") return '<span class="tag">已含</span>';
+    if (line.assumption) return '<span class="tag assumption">假設</span>';
+    if (line.sourceUrl) return '<span class="tag sourced">有來源</span>';
+    return '<span class="tag pending">待確認</span>';
+  }
+
+  function acceptanceTag(value) {
+    if (value === "核准") return '<span class="tag ok">核准</span>';
+    if (value === "不接受") return '<span class="tag bad">不接受</span>';
+    return '<span class="tag pending">待確認</span>';
+  }
+
+  function feeTable(plan) {
+    var rows = plan.lines.map(function (line) {
+      var view = E.presentLine(line);
+      var amount = view.blocked ? "不顯示" : (line.amount === null ? "null" : (line.currency === "GBP" ? money(line.amount, "GBP") : money(line.amount)));
+      var contribute = view.blocked || line.contributeTwd === null ? "不計入" : money(line.contributeTwd);
+      if (!view.blocked && line.inclusion === "included") contribute = "已含，不另加";
+      var src = line.sourceUrl ? '<div class="src">' + link(line.sourceUrl, line.source || line.sourceUrl) + "</div>" : "";
+      var note = line.note ? '<div class="src">' + esc(line.note) + "</div>" : "";
+      var blocked = view.blocked ? '<div class="src">' + esc(view.reason) + "</div>" : "";
+      return "<tr><td>" + esc(line.name) + "<br>" + statusTag(line, view) + blocked + src + note + '</td><td class="num">' + amount + '</td><td class="num">' + contribute + "</td></tr>";
+    }).join("");
+    return '<table><thead><tr><th>項目</th><th class="num">金額</th><th class="num">計入成本（未含預備金）</th></tr></thead><tbody>' + rows + "</tbody></table>";
+  }
+
+  function channelCard(ch) {
+    var fees = "固定費 " + (ch.fixed_fee === null ? "null" : ch.fixed_fee) +
+      " · 比例 " + (ch.pct_fee === null ? "null" : ch.pct_fee) +
+      " · 最低 " + (ch.min_fee === null ? "null" : ch.min_fee) +
+      " · 最高 " + (ch.max_fee === null ? "null" : ch.max_fee) +
+      " · 匯差 " + (ch.fx_spread === null ? "null" : ch.fx_spread);
+    var pre = (ch.preconditions || []).map(esc).join("；");
+    return '<article class="card channel"><h3>' + esc(ch.name) + "</h3><p>" +
+      acceptanceTag(ch.school_acceptance) + "學校是否接受 · " + acceptanceTag(ch.payer_eligibility) + "台灣付款人是否已確認</p>" +
+      (pre ? '<p class="fine">前提：' + pre + "</p>" : "") +
+      '<p class="fine">報價狀態：' + esc(ch.quote_status) + "。實付合計：" + (ch.payer_total === null ? "null" : esc(ch.payer_total)) + "</p>" +
+      '<p class="fine">' + esc(fees) + "</p>" +
+      '<p class="src">' + esc(ch.note) + "</p>" +
+      '<p class="src">來源：' + link(ch.source_url, ch.source_url) + (ch.record ? " · " + esc(ch.record) : "") + "</p></article>";
+  }
+
+  function findLine(plan, id) {
+    for (var i = 0; i < plan.lines.length; i++) if (plan.lines[i].id === id) return plan.lines[i];
+    return null;
+  }
+
+  // 只講目前選的這所學校。「格拉斯哥直接匯校不接受」只在選格拉斯哥時出現。
+  function refusedChannelText(model) {
+    if (model.programme.key !== "glasgow") return "";
+    var refused = model.tuitionPay.channels.some(function (ch) {
+      return ch.channel_id === "uog-direct-bank" && ch.school_acceptance === "不接受";
+    });
+    return refused ? "格拉斯哥直接匯到學校是不接受；" : "";
+  }
+
+  // 比率（unit 為「比例」）顯示成百分比，不能套台幣格式變成 NT$0。
+  function percent(n) {
+    var value = Number(n);
+    if (!isFinite(value)) return "—";
+    return parseFloat((value * 100).toFixed(4)) + "%";
+  }
+
+  function catalogValue(entry) {
+    if (entry.amount === null || entry.amount === undefined) return "null";
+    if (entry.unit === "比例") return percent(entry.amount);
+    if (entry.currency === "GBP") return money(entry.amount, "GBP");
+    if (entry.currency === "TWD") return money(entry.amount);
+    return esc(entry.amount);
+  }
+
+  // C 頁給人看的情境 JSON。E 沒放行時，確定值一律遮成 null。
+  function scenarioForDisplay(scenario, summary, review) {
+    if (summary.complete || !scenario.complete) return scenario;
+    var copy = JSON.parse(JSON.stringify(scenario));
+    copy.complete = false;
+    ["final_total_twd", "confirmed_gap_twd", "loan_amount_twd", "monthly_payment_twd", "grace_interest_monthly_twd", "burden_percent"].forEach(function (key) {
+      copy[key] = null;
+    });
+    copy.review_verdict = review.verdict;
+    return copy;
+  }
+
+  function renderA(model) {
+    if (!model.ok) {
+      $("page-a").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
+      return;
+    }
+    var programme = model.programme;
+    var review = model.review;
+    var summary = model.summary;
+    var scenario = model.scenario;
+    var finalText = summary.final_total_twd === null ? "尚未確定" : money(summary.final_total_twd);
+    var gapText = summary.confirmed_gap_twd === null ? "尚未確定" : money(summary.confirmed_gap_twd);
+    var loanText = summary.loan_amount_twd === null ? "尚未確定" : money(summary.loan_amount_twd);
+    var ref = "";
+    if (scenario.reference_only) {
+      ref = '<p class="muted">已知項目的暫估是 ' + money(scenario.reference_only.total) + "，暫估缺口 " + money(scenario.reference_only.gap) + "。這不是確定總額，也不能拿來排名。</p>";
+    }
+    var awardRows = model.awards.length ? model.awards.map(function (award) {
+      return "<li><b>" + esc(award.name) + "</b> " + (award.awarded ? '<span class="tag ok">已核定，計入一次</span>' : '<span class="tag pending">未核定，不計入</span>') +
+        " " + money(award.amount_gbp, "GBP") + " " + esc(award.type) + '<div class="src">' + link(award.source.url, "來源") + " · " + esc(award.stack_note) + "</div></li>";
+    }).join("") : "<li>這個示例還沒有已核對的獎學金，所以不顯示 0 元。</li>";
+    $("page-a").innerHTML =
+      '<div class="kicker">模組 A · 陳致安 · 彙整，不代替審查放行</div>' +
+      "<h2>" + esc(programme.school_name_zh) + " · " + esc(programme.program_name_zh) + "</h2>" +
+      '<p class="lede">下面這頁把學程、費用、試算、付不付得了、以及審查狀態放在一起。確定總額只有在必要項目都有金額、而且 E 沒有退修時才會出現。</p>' +
+      '<div class="' + verdictClass(review.verdict) + '">審查：' + esc(review.verdict) + "。正式 Demo：" + esc(review.formal_demo) + "。" + esc(review.note) + "</div>" +
+      '<div class="kpis">' +
+      '<div class="kpi"><span>已知小計（含預備金）</span><strong>' + money(summary.known_subtotal_twd) + "</strong></div>" +
+      '<div class="kpi alt"><span>確定總額</span><strong>' + finalText + "</strong></div>" +
+      '<div class="kpi alt"><span>確定缺口</span><strong>' + gapText + "</strong></div>" +
+      '<div class="kpi warn"><span>建議貸款</span><strong>' + loanText + "</strong></div></div>" +
+      ref +
+      '<div class="grid-2">' +
+      '<article class="card"><h3>學程</h3><p>' + esc(programme.program_name) + "</p><p class=\"fine\">入學 " + esc(programme.intake || "—") + " · " + esc(programme.course_length_text || "") + "</p>" +
+      '<p class="src">學費 ' + money(programme.tuition.amount, "GBP") + " · " + link(programme.tuition.source.url, "學費來源") + "</p>" +
+      '<p class="src">訂金 ' + money(programme.deposit.amount, "GBP") + "，已含在學費。 " + link(programme.deposit.source.url, "訂金來源") + "</p></article>" +
+      '<article class="card"><h3>資金怎麼分</h3><ul class="list">' + awardRows +
+      "<li>自備款 " + money(scenario.funds.savings) + " <span class=\"tag assumption\">假設</span></li>" +
+      "<li>家庭支援 " + money(scenario.funds.family) + " <span class=\"tag assumption\">假設</span></li>" +
+      "<li>已計入的獎學金／減免 " + money(scenario.funds.scholarship) + "。未核定的獎項不會出現在這裡。</li></ul>" +
+      '<p class="fine">匯率 ' + esc(scenario.fx_rate) + "（假設）、預備金 " + esc(scenario.reserve_rate) + "（假設）。</p></article></div>" +
+      '<article class="card" style="margin-top:16px"><h3>費用</h3>' + feeTable(model.plan) + "</article>" +
+      '<article class="card" style="margin-top:16px"><h3>付不付得了</h3><p>學費管道比的是待付餘額 ' +
+      (model.tuitionDue.amount === null ? "（尚未確認，不排名）" : money(model.tuitionDue.amount, "GBP")) +
+      "。" + refusedChannelText(model) + "沒有報價的管道不產生最低價。" +
+      ' <button class="btn secondary" type="button" data-page="d">看支付比較</button></p></article>';
+  }
+
+  function renderB() {
+    var selected = $("preset").value;
+    var cards = B.list().map(function (programme) {
+      var on = programme.key === selected ? " selected" : "";
+      return '<article class="card program' + on + '">' +
+        '<span class="tag sourced">有來源</span>' +
+        "<h3>" + esc(programme.school_name_zh) + " · " + esc(programme.program_name_zh) + "</h3>" +
+        "<div>" + esc(programme.program_name) + " · 入學 " + esc(programme.intake) + "</div>" +
+        "<p>學費 " + money(programme.tuition.amount, "GBP") + " · 訂金 " + money(programme.deposit.amount, "GBP") + "（已含在學費）</p>" +
+        '<p class="src">學費：' + link(programme.tuition.source.url, "來源") + " · 訂金：" + link(programme.deposit.source.url, "來源") + "</p>" +
+        '<button class="btn" type="button" data-action="select-programme" data-key="' + esc(programme.key) + '">選這個學程</button></article>';
+    }).join("");
+    var programme = B.buildOutput(selected);
+    var scholarships = programme.scholarships.length ? programme.scholarships.map(function (item) {
+      return "<li><b>" + esc(item.name) + "</b> · " + esc(item.type) + " · " + money(item.amount_gbp, "GBP") + " · " + esc(item.year) +
+        '<div class="src">' + link(item.source.url, "來源") + "</div><p class=\"fine\">" + esc(item.stack_note) + "</p></li>";
+    }).join("") : "<li>" + esc(programme.scholarship_note || "尚無已核對獎學金。") + "</li>";
+    var lengthTag = programme.course_length_mapping === "假設" ? '<span class="tag assumption">假設</span>' : '<span class="tag sourced">學程頁</span>';
+    $("page-b").innerHTML =
+      '<div class="kicker">模組 B · 曾尉庭 · 學程、學費、訂金、獎學金</div>' +
+      "<h2>先選一個英國示例</h2>" +
+      '<p class="lede">這兩個學程的學費和訂金來自校方頁面。訂金會抵學費，不是第三筆成本。獎學金在你確認獲獎之前，不會拿去填缺口。</p>' +
+      '<div class="grid-2" style="margin:16px 0">' + cards + "</div>" +
+      '<div class="grid-2"><article class="card"><h3>目前這一個</h3>' +
+      "<p>" + esc(programme.school_name_zh) + " · " + esc(programme.program_name) + "</p>" +
+      "<p>課程長度 " + esc(programme.course_length_months) + " 個月 " + lengthTag + "</p>" +
+      '<p class="fine">' + esc(programme.course_length_text) + "</p>" +
+      "<p>校方保險 <span class=\"tag pending\">待確認</span> 金額 null，不當成 0。</p>" +
+      '<p class="fine">' + esc(programme.payment_hint) + "</p>" +
+      '<div class="row-actions"><button class="btn" type="button" data-page="c">用這個學程試算</button></div></article>' +
+      '<article class="card"><h3>獎學金</h3><ul class="list">' + scholarships + "</ul>" +
+      (programme.sponsor_rule ? '<p class="fine">' + esc(programme.sponsor_rule.note) + (programme.sponsor_rule.url ? " " + link(programme.sponsor_rule.url, "相關頁") : "") + "</p>" : "") +
+      "</article></div>";
+  }
+
+  function renderC(model) {
+    var programme = model.programme || B.buildOutput($("preset").value);
+    var ihs = C.ihsAmountGbp($("course-months").value);
+    $("ihs").value = ihs.amount === null ? "待確認" : String(ihs.amount);
+    $("visa-fee").value = String(C.VISA_FEE_OUTSIDE_GBP);
+    if (!model.ok) {
+      $("c-results").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
+      return;
+    }
+    var plan = model.plan;
+    var scenario = model.scenario;
+    var review = model.review;
+    // 跟 A 頁一樣：確定值只從 A.summarize（已套 E 審查）拿，不直接讀 scenario。
+    var summary = model.summary;
+    var banner;
+    if (summary.complete) {
+      banner = '<div class="banner ok">必要費用都有金額。下面的確定總額仍是這組假設下的試算，不是學校或銀行報價。正式 Demo 尚未放行。</div>';
+    } else if (scenario.complete) {
+      var why = review.blockers.map(function (item) {
+        return esc(item.name) + "：" + esc(E.presentLine(findLine(plan, item.id) || {}).reason || item.code);
+      }).join("；");
+      banner = '<div class="' + verdictClass(review.verdict) + '">金額都填了，但 E 審查是「' + esc(review.verdict) + "」，所以確定總額、確定缺口、建議貸款都空著。" +
+        esc(review.note) + (why ? "原因：" + why : "") + "</div>";
+    } else {
+      banner = '<div class="banner">還有待確認項目（目前通常是校方保險），所以確定總額、確定缺口、建議貸款都空著。已知小計只供對照。</div>';
+    }
+    var rejectedNote = (model.published.rejected || []).map(function (item) {
+      return '<div class="banner bad">「' + esc(item.name) + "」被契約檢查拒收：" + esc(item.reason) + "。這一筆先當待確認，不計入總額；改好欄位就會重算。</div>";
+    }).join("");
+    var depositLine = "待付學費餘額：";
+    if (!plan.deposit || plan.deposit.balanceDue === null) depositLine += "尚未確認";
+    else depositLine += money(plan.deposit.balanceDue, "GBP") + "（訂金" + (plan.deposit.paid ? "已付" : "未付") + "）。總學費不因訂金改變。";
+    var loanLine = "";
+    if (summary.complete && summary.monthly_payment_twd !== null) {
+      loanLine = '<p class="muted">假設年利率 ' + (plan.annualRate === null ? "—" : (plan.annualRate * 100).toFixed(2)) +
+        "%、" + esc(plan.termMonths) + " 期，估月付 " + money(summary.monthly_payment_twd) +
+        (plan.burdenPercent === null ? "" : "，負擔比 " + plan.burdenPercent + "%") + "。不保證核貸。</p>";
+    } else if (summary.reference_only) {
+      loanLine = '<p class="muted">若只看已知名目，暫估缺口 ' + money(summary.reference_only.gap) + "，暫估貸款 " + money(summary.reference_only.loan) + "。這不是確定值。</p>";
+    }
+    var lastLabel = "建議貸款（假設）";
+    var lastValue = summary.loan_amount_twd === null ? "尚未確定" : money(summary.loan_amount_twd);
+    if (!summary.complete && summary.reference_only) {
+      lastLabel = "暫估總額";
+      lastValue = money(summary.reference_only.total);
+    }
+    var shown = scenarioForDisplay(scenario, summary, review);
+    var jsonTitle = shown === scenario ? "交給 A 的情境 JSON" : "情境 JSON（E 還沒放行，確定值先遮成 null）";
+    $("c-results").innerHTML = banner + rejectedNote +
+      '<div class="kpis"><div class="kpi"><span>已知小計</span><strong>' + money(summary.known_subtotal_twd) + "</strong></div>" +
+      '<div class="kpi alt"><span>確定總額</span><strong>' + (summary.final_total_twd === null ? "尚未確定" : money(summary.final_total_twd)) + "</strong></div>" +
+      '<div class="kpi alt"><span>確定缺口</span><strong>' + (summary.confirmed_gap_twd === null ? "尚未確定" : money(summary.confirmed_gap_twd)) + "</strong></div>" +
+      '<div class="kpi warn"><span>' + lastLabel + "</span><strong>" + lastValue + "</strong></div></div>" +
+      '<article class="card"><h3>費用明細</h3><p class="fine">' + esc(depositLine) + "</p>" + loanLine + feeTable(plan) + "</article>" +
+      '<details class="card" style="margin-top:12px"><summary>' + jsonTitle + '</summary><pre class="json">' + esc(JSON.stringify(shown, null, 2)) + "</pre></details>" +
+      '<p class="fine">IHS 說明：' + esc(ihs.reason || "") + "</p>";
+    $("tuition-src").innerHTML = programme && programme._tuitionEdited
+      ? "你改過學費，這格改標假設，不再掛校方公布價。"
+      : "來源：" + link(programme.tuition.source.url, programme.tuition.source.label) + "。";
+    $("deposit-src").innerHTML = programme && programme._depositEdited
+      ? "你改過訂金，這格改標假設。訂金仍不另加總成本。"
+      : "來源：" + link(programme.deposit.source.url, programme.deposit.source.label) + "。已含在學費裡。";
+  }
+
+  function renderD(model) {
+    if (!model.ok) {
+      $("page-d").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
+      return;
+    }
+    var ref = model.tuitionPay.reference_only[0];
+    $("page-d").innerHTML =
+      '<div class="kicker">模組 D · 方澤享 · 先看收不收，再看有沒有報價</div>' +
+      "<h2>訂金和學費分開付</h2>" +
+      '<p class="lede">比較用的是 C 算出的待付金額，不是把訂金再加進學費。沒有來源的手續費維持 null，這頁不選出最便宜的管道。</p>' +
+      '<div class="banner">' + esc(model.tuitionPay.message) + "。最低成本：沒有。</div>" +
+      '<div class="grid-2"><section><h3>訂金管道</h3><p class="fine">這次待付 ' +
+      (model.depositDue.amount === null ? "尚未確認" : money(model.depositDue.amount, "GBP")) + "。 " + esc(model.depositDue.note || "") + "</p>" +
+      model.depositPay.channels.map(channelCard).join("") + "</section><section><h3>學費餘額管道</h3><p class=\"fine\">這次待付 " +
+      (model.tuitionDue.amount === null ? "尚未確認" : money(model.tuitionDue.amount, "GBP")) + "。 " + esc(model.tuitionDue.note || "") + "</p>" +
+      model.tuitionPay.channels.map(channelCard).join("") + "</section></div>" +
+      '<article class="card" style="margin-top:8px"><h3>參考，不參與排名</h3><p><b>' + esc(ref.name) + "</b> <span class=\"tag pending\">" + esc(ref.applicability) + "</span></p>" +
+      "<p>匯費 0.05%，最低 " + money(ref.min_fee) + "，最高 " + money(ref.max_fee) + "，電報 " + money(ref.fixed_fee) + "／通。每日額度低於 " + money(ref.daily_limit_twd) + "（不含本數）。新受款資料「" + esc(ref.payee_setup_lead) + "」生效，原文沒有定義是不是營業日。</p>" +
+      '<p class="src">' + esc(ref.note) + "</p><p class=\"src\">" + link(ref.source_urls[0], "收費標準") + " · " + link(ref.source_urls[1], "個人網銀約定") + "</p></article>";
+  }
+
+  function renderE(model) {
+    var rows = Constants.catalog.map(function (entry) {
+      var kind = entry.kind === "sourced" ? '<span class="tag sourced">有來源</span>' : entry.kind === "assumption" ? '<span class="tag assumption">假設</span>' : '<span class="tag pending">待確認</span>';
+      var amount = catalogValue(entry);
+      var url = entry.url ? link(entry.url, "開啟來源") : "—";
+      return "<tr><td>" + esc(entry.label) + "<br>" + kind + '<div class="src">' + esc(entry.note || "") + "</div></td><td class=\"num\">" + amount + "</td><td>" + url + "</td></tr>";
+    }).join("");
+    var rejected = Constants.rejected.map(function (item) {
+      return "<li>" + esc(item.currency) + " " + esc(item.amount) + "：" + esc(item.reason) + "</li>";
+    }).join("");
+    var verdict = model.ok ? model.review : { verdict: "退修", formal_demo: "尚未放行", note: model.error, pending: [], blockers: [] };
+    var pending = model.ok ? model.review.pending.map(esc).join("、") : "";
+    $("page-e").innerHTML =
+      '<div class="kicker">模組 E · 何則文 · 來源、待確認、放行檢查</div>' +
+      "<h2>學生畫面只留下查得到的數字</h2>" +
+      '<div class="' + verdictClass(verdict.verdict) + '">這份試算：' + esc(verdict.verdict) + "。正式 Demo：" + esc(verdict.formal_demo) + "。" + esc(verdict.note || "") + "</div>" +
+      (pending ? '<p class="muted">待確認的費用代號：' + pending + "。這些存在時，不能把已知小計說成完整總額。</p>" : "") +
+      '<article class="card"><h3>這次試算用到的常數</h3><table><thead><tr><th>項目</th><th class="num">值</th><th>來源</th></tr></thead><tbody>' + rows + "</tbody></table></article>" +
+      '<div class="grid-2" style="margin-top:16px"><article class="card"><h3>明確不用的數字</h3><ul class="list">' + rejected + "</ul></article>" +
+      '<article class="card"><h3>這輪先不做</h3><ul class="list"><li>IHS 校方預算表和 GOV.UK 差多少，不再往下追；收費以 GOV.UK 為準。</li><li>圖書館罰款、退款基數、Flywire 狀態日期，都不做自動判定。</li><li>簽證滿兩年以後的 IHS 算法還沒核完，金額維持 null。</li><li>協調頁還沒有 D-20261112-d33g 的組員確認欄。範圍先照該次拍板，狀態仍是待確認。</li></ul></article></div>';
+  }
+
+  function render() {
+    var model = currentCase();
+    renderA(model);
+    renderB();
+    renderC(model);
+    renderD(model);
+    renderE(model);
+  }
+
+  $("calc-form").addEventListener("submit", function (event) { event.preventDefault(); });
+
+  document.addEventListener("click", function (event) {
+    var pageBtn = event.target.closest("[data-page]");
+    if (pageBtn && pageBtn.getAttribute("data-page")) {
+      showPage(pageBtn.getAttribute("data-page"));
+      return;
+    }
+    var actionBtn = event.target.closest("[data-action]");
+    if (!actionBtn) return;
+    var action = actionBtn.getAttribute("data-action");
+    if (action === "select-programme") {
+      $("preset").value = actionBtn.getAttribute("data-key");
+      applyOfficialNumbers();
+      render();
+    }
+    if (action === "use-55k") $("twd").value = "55000";
+    if (action === "use-60k") $("twd").value = "60000";
+    if (action === "use-55k" || action === "use-60k") render();
+  });
+
+  ["preset", "tuition", "deposit", "course-months", "deposit-paid", "living-m", "living-months", "other-gbp", "twd", "ins-flag", "ins-amt", "ins-evidence", "fx", "reserve", "awarded", "savings", "family", "scholarship", "income", "rate", "term", "grace"].forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("input", render);
+    el.addEventListener("change", function () {
+      if (id === "preset") applyOfficialNumbers();
+      render();
+    });
+  });
+
+  window.addEventListener("hashchange", function () {
+    showPage((location.hash || "#a").slice(1));
+  });
+
+  applyOfficialNumbers();
+  showPage((location.hash || "#a").replace("#", "") || "a");
+})();

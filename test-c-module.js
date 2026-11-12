@@ -230,6 +230,32 @@ check("學生預設格拉斯哥路徑：校保待確認時確定總額必須是 
   assert.strictEqual(ihsLine.amount, 1164);
 });
 
+check("plan.lines 帶 zeroEvidence 給 E：有證據為 true，沒給為 false", function () {
+  var r = plan({
+    fees: [
+      { id: "tuition-01", version: 1, amount: 1000000, currency: "TWD", inclusion: "extra", required: true },
+      { id: "ins-01", version: 1, amount: 0, currency: "TWD", inclusion: "none", required: true, zeroEvidence: true },
+    ],
+  });
+  assert.strictEqual(r.lines.find(function (l) { return l.id === "ins-01"; }).zeroEvidence, true);
+  assert.strictEqual(r.lines.find(function (l) { return l.id === "tuition-01"; }).zeroEvidence, false);
+});
+
+check("攤還期數 0 或負數、預備金負數：擋下不算", function () {
+  var fees = [{ id: "tuition-01", version: 1, amount: 1000000, currency: "TWD", inclusion: "extra", required: true }];
+  var zero = plan({ fees: fees, loan: { annualRate: 0.03, termMonths: 0, graceMonths: 0 } });
+  assert.strictEqual(zero.ok, false);
+  assert.ok(zero.error.indexOf("攤還期數") >= 0);
+  var neg = plan({ fees: fees, loan: { annualRate: 0.03, termMonths: -6, graceMonths: 0 } });
+  assert.strictEqual(neg.ok, false);
+  var reserve = plan({ fees: fees, reserveRate: -0.1 });
+  assert.strictEqual(reserve.ok, false);
+  assert.ok(reserve.error.indexOf("預備金") >= 0);
+  var blankTerm = plan({ fees: fees, loan: { annualRate: 0.03, termMonths: null, graceMonths: 0 } });
+  assert.strictEqual(blankTerm.ok, true);
+  assert.strictEqual(blankTerm.monthlyPayment, null);
+});
+
 if (process.exitCode) {
   console.error("Some tests failed.");
 } else {
