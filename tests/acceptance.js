@@ -884,3 +884,7 @@ check("畫面 A 頁：「格拉斯哥直接匯校不接受」只在選格拉斯�
 
 if (process.exitCode) console.error("\nAcceptance tests failed.");
 else console.log("\nAll " + passed + " acceptance tests passed.");
+
+// C 情境模擬的驗收在 tests/scenarios.js。從這裡載入，CI 的 Acceptance tests 步驟就會一併跑到。
+console.log("");
+require("./scenarios.js");
