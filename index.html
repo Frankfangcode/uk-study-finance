@@ -3,295 +3,137 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>留學財務長 AI｜英國碩士成本試算（模擬）</title>
-  <style>
-    :root {
-      --ink: #1b201c;
-      --muted: #5c675e;
-      --paper: #f3eee4;
-      --card: #fbf8f1;
-      --line: #d8d0c2;
-      --green: #1b4a3a;
-      --green-2: #2a6a52;
-      --copper: #9a6230;
-      --warn: #8a2f2f;
-      --ok: #215c3a;
-      --pending: #8a5a12;
-      --shadow: 0 10px 30px rgba(27, 32, 28, 0.06);
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
-    body {
-      font-family: "Iowan Old Style", "Palatino Linotype", "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", Georgia, serif;
-      line-height: 1.55;
-    }
-    button, input, select, textarea, .ui, nav, table, .tag, .kpi, .btn, label, .nav-btn {
-      font-family: "Avenir Next", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
-    }
-    a { color: var(--green); }
-    .topbar {
-      background: var(--green);
-      color: #f6f1e7;
-      padding: 14px 28px 0;
-      position: sticky; top: 0; z-index: 10;
-    }
-    .brand {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
-      padding-bottom: 12px; border-bottom: 1px solid rgba(246,241,231,.2);
-    }
-    .brand h1 { font-size: 22px; margin: 0; font-weight: 600; letter-spacing: .02em; }
-    .brand .scope { font-size: 12px; opacity: .85; letter-spacing: .06em; }
-    nav { display: flex; gap: 4px; padding: 8px 0 0; overflow-x: auto; }
-    .nav-btn {
-      appearance: none; border: 0; background: transparent; color: #e7efe9;
-      padding: 10px 14px 12px; cursor: pointer; font-size: 13px; border-radius: 6px 6px 0 0;
-    }
-    .nav-btn[aria-current="page"] { background: var(--paper); color: var(--ink); font-weight: 600; }
-    main { max-width: 1180px; margin: 0 auto; padding: 28px 22px 80px; }
-    .hero { display: grid; grid-template-columns: 1.4fr .8fr; gap: 28px; margin-bottom: 28px; }
-    .kicker { color: var(--copper); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; font-family: "Avenir Next", "PingFang TC", sans-serif; }
-    h2 { font-size: 32px; line-height: 1.25; margin: 6px 0 12px; font-weight: 650; }
-    h3 { font-size: 18px; margin: 0 0 10px; }
-    .lede { font-size: 17px; color: #2c332e; max-width: 40em; }
-    .callout, .card {
-      background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px; box-shadow: var(--shadow);
-    }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-    .program { cursor: pointer; text-align: left; width: 100%; }
-    .program:hover { border-color: var(--green-2); }
-    .program b { display: block; font-size: 16px; margin-bottom: 4px; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .fine { font-size: 12px; color: var(--muted); }
-    .tag {
-      display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px;
-      border: 1px solid var(--line); margin-right: 6px; background: #fff;
-    }
-    .tag.assumption { border-color: #e2c48a; color: var(--pending); background: #fff6e6; }
-    .tag.pending { border-color: #e2c48a; color: var(--pending); background: #fff6e6; }
-    .tag.sourced { border-color: #b7d0c3; color: var(--ok); background: #eef6f1; }
-    .tag.included { border-color: #cfc6b8; color: var(--muted); }
-    form.calc { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-    fieldset { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 14px 16px 16px; margin: 0 0 12px; }
-    legend { padding: 0 6px; font-size: 13px; letter-spacing: .04em; color: var(--green); font-weight: 650; }
-    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-    .field.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    label { font-size: 12px; color: var(--muted); }
-    input, select {
-      border: 1px solid #cfc6b8; border-radius: 8px; padding: 8px 10px; font-size: 14px; background: #fff;
-    }
-    input:focus, select:focus { outline: 2px solid #b7d0c3; border-color: var(--green-2); }
-    .src { font-size: 11px; color: var(--muted); }
-    .src a { word-break: break-word; }
-    .results { position: sticky; top: 86px; }
-    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .kpi { background: #1b4a3a; color: #f6f1e7; border-radius: 12px; padding: 12px 14px; }
-    .kpi.alt { background: #2a3a32; }
-    .kpi.warn { background: #6d3a28; }
-    .kpi span { display: block; font-size: 11px; letter-spacing: .08em; opacity: .8; }
-    .kpi strong { display: block; font-size: 22px; margin-top: 4px; font-variant-numeric: tabular-nums; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { font-size: 11px; color: var(--muted); font-weight: 600; }
-    td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .banner {
-      border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; font-size: 13px;
-      background: #fff3d8; color: #5c3d10; border: 1px solid #e2c48a;
-    }
-    .banner.ok { background: #eef6f1; color: var(--ok); border-color: #b7d0c3; }
-    pre.json {
-      background: #1b201c; color: #e8efe9; border-radius: 10px; padding: 12px; font-size: 11px;
-      overflow: auto; max-height: 280px; font-family: "IBM Plex Mono", "SF Mono", Menlo, monospace;
-    }
-    .placeholder { padding: 8px 0 20px; }
-    footer { max-width: 1180px; margin: 0 auto 40px; padding: 0 22px; color: var(--muted); font-size: 12px; }
-    .hidden { display: none !important; }
-    .list li { margin-bottom: 6px; }
-    @media (max-width: 900px) {
-      .hero, form.calc, .grid-2, .grid-3, .field.row, .kpis, .brand { grid-template-columns: 1fr; display: block; }
-      .results { position: static; }
-    }
-  </style>
+  <title>留學財務長 AI｜英國碩士費用試算</title>
+  <link rel="stylesheet" href="css/site.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <h1>留學財務長 AI</h1>
-      <div class="scope">網站模擬 · 先只做英國 · 台灣學生赴英碩士</div>
+      <div class="scope">台灣學生赴英碩士 · 只做比較 · 不保證核貸</div>
     </div>
     <nav aria-label="模組">
-      <button class="nav-btn" data-page="home" aria-current="page">總覽</button>
-      <button class="nav-btn" data-page="school">選校與獎學金（B）</button>
-      <button class="nav-btn" data-page="cost">成本與貸款試算（C）</button>
-      <button class="nav-btn" data-page="pay">匯款與支付（D）</button>
-      <button class="nav-btn" data-page="review">審查與來源（E）</button>
+      <button class="nav-btn" type="button" data-page="a" aria-current="page">彙整（A）</button>
+      <button class="nav-btn" type="button" data-page="b">選校與獎學金（B）</button>
+      <button class="nav-btn" type="button" data-page="c">成本與貸款（C）</button>
+      <button class="nav-btn" type="button" data-page="d">付款比較（D）</button>
+      <button class="nav-btn" type="button" data-page="e">審查（E）</button>
     </nav>
   </header>
 
+  <div class="context" aria-label="這次試算的選擇">
+    <label>學程
+      <select id="programme">
+        <option value="uog-dsai-2027">格拉斯哥 · 資料科學與人工智慧碩士 · 2027-09</option>
+        <option value="uoe-ds-2027">愛丁堡 · 資料科學碩士 · 2027-09</option>
+      </select>
+    </label>
+    <label>訂金狀態
+      <select id="deposit-status">
+        <option value="unpaid">未付</option>
+        <option value="paid">已付</option>
+        <option value="unknown">未知</option>
+      </select>
+    </label>
+    <label class="inline"><input id="award-gls" type="checkbox" /> 已獲核定格拉斯哥全球領導獎學金</label>
+    <label class="inline"><input id="uk-account" type="checkbox" /> 我有英國銀行帳戶</label>
+  </div>
+
   <main>
-    <section id="page-home">
-      <div class="hero">
-        <div>
-          <div class="kicker">Classroom mockup · UK only</div>
-          <h2>先把英國碩士要花的錢算清楚，再決定要不要借、借多少。</h2>
-          <p class="lede">這是可操作的網站模擬，不是已放行的正式 Demo。C 模組（總成本、資金缺口、貸款試算）已經可以算；選校、獎學金與匯款比價先放占位，等各角色交程式後接上。</p>
-          <p class="muted">系統只提供可追溯的比較，不保證核貸，也不代替你做決定。有來源的數字會附網址；沒有來源的會標成「假設」。</p>
-        </div>
-        <div class="callout">
-          <h3>這一版做了什麼</h3>
-          <ul class="list muted">
-            <li>範圍已依澤享真人拍板：先只做英國。</li>
-            <li>C 模組可執行：已含／另計／待確認／無此費用，待確認不當 0，訂金不重計，貸款上取整萬元。</li>
-            <li>內建格拉斯哥、愛丁堡兩個學程示例，學費與 IHS、簽證費附來源。</li>
-            <li>校方強制保險預設「待確認」，因此正式總額會標為尚未確定。</li>
-          </ul>
-        </div>
-      </div>
-      <div class="grid-3">
+    <section id="page-a">
+      <div class="kicker">模組 A · 彙整</div>
+      <h2 id="a-title">這一頁把學程、費用、缺口和付款限制放在一起。</h2>
+      <p class="lede">數字旁邊有來源。標「假設」的可以改。標「待確認」的沒有被當成 0。這不是正式放行，也不代替你決定。</p>
+      <div id="a-banner" class="banner"></div>
+      <div id="a-kpis" class="kpis"></div>
+      <div class="grid-2">
         <div class="card">
-          <div class="kicker">B · 占位</div>
-          <h3>選校與獎學金</h3>
-          <p class="muted">先用兩校公開學費／訂金當示例。完整門檻、獎學金判定待 Hunter 交付程式。</p>
+          <h3>費用</h3>
+          <div id="a-fees"></div>
         </div>
-        <div class="card">
-          <div class="kicker">C · 已實作</div>
-          <h3>成本、缺口、貸款</h3>
-          <p class="muted">依協作表 C 角色公式：外幣換算加台幣支出，再加預備金；資金不夠再上取整萬估貸款。</p>
-        </div>
-        <div class="card">
-          <div class="kicker">D / E · 占位</div>
-          <h3>支付與審查</h3>
-          <p class="muted">會顯示待付餘額與來源清單。費率比價與正式放行還不能用編造的數字充當。</p>
+        <div class="stack">
+          <div class="card">
+            <h3>還沒有定的事</h3>
+            <div id="a-open"></div>
+          </div>
+          <div class="card">
+            <h3>這一輪瀏覽器裡的試算</h3>
+            <p class="fine">改了數字會多一列。舊的那一列不會被改寫。</p>
+            <div id="a-history"></div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section id="page-school" class="hidden placeholder">
-      <div class="kicker">模組 B · 占位（可先選學程，把數字帶進 C）</div>
-      <h2>選校與獎學金</h2>
-      <p class="lede">以下兩筆是協作表已查過、有來源的英國碩士示例。獎學金資格與其他學程尚未做成查詢工具。</p>
+    <section id="page-b" class="hidden">
+      <div class="kicker">模組 B · 選校與獎學金</div>
+      <h2>兩個已核對的英國學程。</h2>
+      <p class="lede">學費和訂金來自校方頁面。訂金是學費的預付，不會再加進總成本。獎學金要等你真的核定，才會變成淨學費。</p>
+      <div id="b-cards" class="grid-2" style="margin-top:16px"></div>
       <div class="grid-2" style="margin-top:16px">
-        <button class="card program" data-preset="glasgow" type="button">
-          <span class="tag sourced">有來源</span>
-          <b>格拉斯哥大學 · 資料科學與人工智慧碩士</b>
-          <div>2027-28 國際生學費 £34,815 · 訂金 £2,000（含在學費內）</div>
-          <p class="src">來源：<a href="https://www.gla.ac.uk/postgraduate/taught/data-science-artificial-intelligence/" target="_blank" rel="noopener">學程頁</a>；訂金規則見 <a href="https://www.gla.ac.uk/postgraduate/feesandfunding/deposits/" target="_blank" rel="noopener">訂金頁</a>。查閱紀錄 B-20261110-m4p2。</p>
-        </button>
-        <button class="card program" data-preset="edinburgh" type="button">
-          <span class="tag sourced">有來源</span>
-          <b>愛丁堡大學 · 資料科學碩士</b>
-          <div>2027/8 國際生學費 £47,680 · 訂金 £1,500（含在學費內）</div>
-          <p class="src">來源：<a href="https://study.ed.ac.uk/programmes/postgraduate-taught-campus-fees?programme_code=PTMSCDATSC1F&year=2027" target="_blank" rel="noopener">學費頁</a>、<a href="https://study.ed.ac.uk/programmes/postgraduate-taught/902-data-science" target="_blank" rel="noopener">學程頁</a>。發布 2026-10-06；見 B-20261110-k7m2／m4p1。</p>
-        </button>
+        <div class="card" id="b-scholarship"></div>
+        <div class="card" id="b-notes"></div>
       </div>
     </section>
 
-    <section id="page-cost" class="hidden">
-      <div class="kicker">模組 C · 可執行入口</div>
-      <h2>成本與貸款試算</h2>
-      <p class="lede">先選學程，再填你的資金與假設。待確認的費用不會被當成 0；因此只要校保仍待查，正式總額就不會假裝已經算完。</p>
+    <section id="page-c" class="hidden">
+      <div class="kicker">模組 C · 成本、缺口、貸款</div>
+      <h2>先看已知的費用，再看哪些還不能算完。</h2>
+      <p class="lede">總成本、缺口、貸款額、月付是四個不同的欄位。待確認的校保會讓確定總額留空。</p>
       <form class="calc" id="calc-form">
         <div>
           <fieldset>
-            <legend>學程與官方費用</legend>
-            <div class="field">
-              <label for="preset">學程示例</label>
-              <select id="preset">
-                <option value="glasgow">格拉斯哥大學 · MSc Data Science &amp; AI（2027-28）</option>
-                <option value="edinburgh">愛丁堡大學 · MSc Data Science（2027/8）</option>
-                <option value="custom">自訂（請自行填學費並標假設或來源）</option>
-              </select>
-            </div>
-            <div class="field row">
-              <div>
-                <label for="tuition">學費（GBP）</label>
-                <input id="tuition" type="number" min="0" step="1" />
-                <div class="src" id="tuition-src"></div>
-              </div>
-              <div>
-                <label for="deposit">訂金（GBP，已含在學費）</label>
-                <input id="deposit" type="number" min="0" step="1" />
-              </div>
-            </div>
+            <legend>官方費用（跟著上面的學程）</legend>
+            <div id="c-official"></div>
             <div class="field row">
               <div>
                 <label for="course-months">課程長度（月）</label>
-                <input id="course-months" type="number" min="1" step="1" />
-                <div class="src">用來推 IHS。規則見 <a href="https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-student" target="_blank" rel="noopener">ST 25.3</a></div>
+                <input id="course-months" type="number" min="1" step="1" value="12" />
+                <div class="src" id="c-length-src"></div>
               </div>
               <div>
-                <label><input id="deposit-paid" type="checkbox" /> 訂金已付（只改待付餘額）</label>
-                <div class="src">條款：訂金抵學費，不另加總成本。</div>
-              </div>
-            </div>
-            <div class="field row">
-              <div>
-                <label for="ihs">IHS（GBP，依規則自動帶入）</label>
-                <input id="ihs" type="number" min="0" step="1" readonly />
-                <div class="src">學生 £776／年；一年制常見 £1,164。<a href="https://www.gov.uk/healthcare-immigration-application/how-much-pay" target="_blank" rel="noopener">GOV.UK IHS</a></div>
-              </div>
-              <div>
-                <label for="visa-fee">簽證費（GBP，境外申請）</label>
-                <input id="visa-fee" type="number" min="0" step="1" readonly />
-                <div class="src">£558。<a href="https://www.gov.uk/student-visa" target="_blank" rel="noopener">GOV.UK Student visa</a></div>
+                <label for="ihs-readout">IHS（依課程長度）</label>
+                <div id="ihs-readout"></div>
               </div>
             </div>
           </fieldset>
           <fieldset>
-            <legend>假設與待確認（請自行調整）</legend>
+            <legend>假設，可以改</legend>
             <div class="field row">
               <div>
                 <label for="living-m">每月生活費（GBP）<span class="tag assumption">假設</span></label>
                 <input id="living-m" type="number" min="0" step="1" value="1500" />
-                <div class="src">預設 1,500 引自專題原稿示例，不是官價。簽證財力門檻（非倫敦）£1,171×9，見 <a href="https://www.gov.uk/student-visa/money" target="_blank" rel="noopener">GOV.UK money</a>，不與本列重複加總。</div>
+                <div class="src">原稿示例，不是官價。簽證財力門檻不加進這裡。</div>
               </div>
               <div>
-                <label for="living-months">生活費月數<span class="tag assumption">假設</span></label>
+                <label for="living-months">生活費月數 <span class="tag assumption">假設</span></label>
                 <input id="living-months" type="number" min="1" step="1" value="12" />
               </div>
             </div>
-            <div class="field row">
-              <div>
-                <label for="other-gbp">其他外幣支出（GBP）<span class="tag assumption">假設</span></label>
-                <input id="other-gbp" type="number" min="0" step="1" value="0" />
-              </div>
-              <div>
-                <label for="twd">台幣支出，如機票（TWD）<span class="tag assumption">假設</span></label>
-                <input id="twd" type="number" min="0" step="1" value="55000" />
-                <div class="src">原稿有 55,000 與 60,000 兩種寫法，尚未拍板，預設 55,000 可改。</div>
+            <div class="field">
+              <label for="twd">台幣支出，例如機票（TWD）<span class="tag assumption">假設</span></label>
+              <input id="twd" type="number" min="0" step="1" value="55000" />
+              <div class="src">原稿有 55,000 和 60,000 兩種寫法，組員還沒選定。
+                <button class="linkish" type="button" id="use-55">用 55,000</button>
+                ·
+                <button class="linkish" type="button" id="use-60">用 60,000</button>
               </div>
             </div>
             <div class="field row">
               <div>
-                <label for="ins-flag">校方強制保險</label>
-                <select id="ins-flag">
-                  <option value="pending" selected>待確認（金額不當 0）</option>
-                  <option value="extra">另計（請填金額）</option>
-                  <option value="included">已含在學費</option>
-                  <option value="none">無此費用（需有證據才當 0）</option>
-                </select>
-              </div>
-              <div>
-                <label for="ins-amt">校保金額（GBP）</label>
-                <input id="ins-amt" type="number" min="0" step="1" placeholder="待確認請留空" />
-              </div>
-            </div>
-            <label class="fine"><input id="ins-evidence" type="checkbox" /> 我有可追溯的零費證據（只有選「無此費用」時才有意義）</label>
-            <div class="field row" style="margin-top:10px">
-              <div>
-                <label for="fx">匯率（GBP→TWD）<span class="tag assumption">假設</span></label>
+                <label for="fx">匯率 GBP→TWD <span class="tag assumption">假設</span></label>
                 <input id="fx" type="number" min="0" step="0.01" value="41" />
-                <div class="src">協作表示例用 41.0，不是即時牌價。</div>
+                <div class="src">協作表示例 41，不是即時牌價。</div>
               </div>
               <div>
-                <label for="reserve">預備金比例<span class="tag assumption">假設</span></label>
+                <label for="reserve">預備金比例 <span class="tag assumption">假設</span></label>
                 <input id="reserve" type="number" min="0" step="0.01" value="0.05" />
-                <div class="src">原稿公式：外幣換算加台幣支出後，再加 5%。</div>
+                <div class="src">原稿公式是先換算再加 5%。留空不會當成 0。</div>
               </div>
             </div>
           </fieldset>
           <fieldset>
-            <legend>資金與貸款（皆為假設，不保證核貸）</legend>
+            <legend>資金與貸款假設</legend>
             <div class="field row">
               <div>
                 <label for="savings">自備款（TWD）<span class="tag assumption">假設</span></label>
@@ -304,20 +146,20 @@
             </div>
             <div class="field row">
               <div>
-                <label for="scholarship">已確定獎學金（TWD）</label>
-                <input id="scholarship" type="number" min="0" step="1" value="0" />
-                <div class="src">未確定的獎學金請填 0，不要先算進去。</div>
+                <label for="scholarship-cash">已確定的現金獎學金（TWD）</label>
+                <input id="scholarship-cash" type="number" min="0" step="1" value="0" />
+                <div class="src">校方學費減免不要填這裡。未核定的獎填 0，或留空表示這欄還沒填。</div>
               </div>
               <div>
-                <label for="income">出國後月收入（TWD）<span class="tag assumption">假設</span></label>
+                <label for="income">試算用月收入（TWD）<span class="tag assumption">假設</span></label>
                 <input id="income" type="number" min="0" step="1" value="55000" />
               </div>
             </div>
             <div class="field row">
               <div>
-                <label for="rate">年利率<span class="tag assumption">假設</span></label>
+                <label for="rate">年利率 <span class="tag assumption">假設</span></label>
                 <input id="rate" type="number" min="0" step="0.0001" value="0.03" />
-                <div class="src">預設 3%，不是任何銀行報價。</div>
+                <div class="src">預設 3%，不是銀行報價。</div>
               </div>
               <div>
                 <label for="term">攤還期數（月）<span class="tag assumption">假設</span></label>
@@ -330,252 +172,57 @@
             </div>
           </fieldset>
         </div>
-        <div class="results">
-          <div id="status-banner" class="banner"></div>
-          <div class="kpis" id="kpis"></div>
+        <div>
+          <div id="c-banner" class="banner"></div>
+          <div id="c-kpis" class="kpis"></div>
           <div class="card">
-            <h3>費用明細</h3>
-            <div id="fee-table"></div>
+            <h3>明細</h3>
+            <div id="c-fees"></div>
           </div>
-          <div class="card" style="margin-top:12px">
-            <h3>交給 A 的情境 JSON（C 出口）</h3>
-            <pre class="json" id="json-out"></pre>
-          </div>
+          <details class="card" style="margin-top:12px">
+            <summary>C 交給 A 的情境 JSON</summary>
+            <pre class="json" id="c-json"></pre>
+          </details>
         </div>
       </form>
     </section>
 
-    <section id="page-pay" class="hidden placeholder">
-      <div class="kicker">模組 D · 占位</div>
-      <h2>匯款與支付</h2>
-      <p class="lede">完整管道費率比價還沒做，因為不能用沒有來源的手續費來排名。先列出已查過的付款限制，並帶出 C 算出的待付餘額。</p>
-      <div class="card" id="pay-panel" style="margin-top:16px"></div>
+    <section id="page-d" class="hidden">
+      <div class="kicker">模組 D · 付款比較</div>
+      <h2>先看學校收不收，再談費用。</h2>
+      <p class="lede">學費管道用的是待付餘額，不是把訂金再加一次。沒有報價的格子保持空白，這一頁不排名。</p>
+      <div id="d-banner" class="banner"></div>
+      <div id="d-amount" class="card"></div>
+      <div id="d-channels" class="grid-2" style="margin-top:16px"></div>
+      <div class="card" id="d-reference" style="margin-top:16px"></div>
     </section>
 
-    <section id="page-review" class="hidden placeholder">
-      <div class="kicker">模組 E · 占位</div>
-      <h2>審查與來源</h2>
-      <p class="lede">正式放行仍須協調者審查。本頁只把目前試算用到的來源、假設與未決事項攤開。</p>
-      <div class="grid-2" style="margin-top:16px">
-        <div class="card" id="source-panel"></div>
-        <div class="card" id="open-panel"></div>
+    <section id="page-e" class="hidden">
+      <div class="kicker">模組 E · 審查</div>
+      <h2>學生畫面上的每個數字，都要查得到出處。</h2>
+      <p class="lede">這裡擋下缺來源、把未知當 0、以及還沒算完卻宣稱總額的結果。正式 Demo 仍要真人放行。</p>
+      <div id="e-banner" class="banner"></div>
+      <div class="card">
+        <h3>這次試算的審查</h3>
+        <div id="e-findings"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <h3>常數與來源</h3>
+        <div id="e-constants"></div>
       </div>
     </section>
   </main>
   <footer>
-    第八組「留學財務長 AI」課堂網站模擬。不構成財務、簽證或錄取建議。數字查閱截至 2026-11-12（台北時間）。C 模組入口由 Frank·D 依澤享 2026-11-12 拍板交付。
+    第八組「留學財務長 AI」課堂網站模擬。查閱到 2026-11-12（台北時間）。不構成錄取、簽證或貸款建議。
+    部署在 GitHub Pages，檔案從倉庫根目錄直接提供。
   </footer>
-  <script src="engine.js"></script>
-  <script>
-    (function () {
-      var C = window.CModule;
-      var pages = ["home", "school", "cost", "pay", "review"];
-      var lastResult = null;
-      var lastMeta = null;
-
-      function $(id) { return document.getElementById(id); }
-
-      function showPage(name) {
-        pages.forEach(function (p) {
-          $("page-" + p).classList.toggle("hidden", p !== name);
-        });
-        document.querySelectorAll(".nav-btn").forEach(function (btn) {
-          btn.setAttribute("aria-current", btn.getAttribute("data-page") === name ? "page" : "false");
-        });
-        if (name !== "home") render();
-        window.scrollTo(0, 0);
-      }
-
-      document.querySelectorAll(".nav-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () { showPage(btn.getAttribute("data-page")); });
-      });
-      document.querySelectorAll("[data-preset]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          $("preset").value = btn.getAttribute("data-preset");
-          applyPreset();
-          showPage("cost");
-        });
-      });
-
-      function applyPreset() {
-        var key = $("preset").value;
-        var p = C.PRESETS[key];
-        if (!p) {
-          $("tuition-src").textContent = "自訂學費請自行附來源，或標為假設。";
-          return;
-        }
-        $("tuition").value = p.tuitionGbp;
-        $("deposit").value = p.depositGbp;
-        $("course-months").value = p.courseLengthMonths;
-        $("tuition-src").innerHTML = "來源：<a href=\"" + p.tuitionSource.url + "\" target=\"_blank\" rel=\"noopener\">" + p.tuitionSource.label + "</a>。";
-        updateAutoFees();
-      }
-
-      function updateAutoFees() {
-        var ihs = C.ihsAmountGbp($("course-months").value);
-        $("ihs").value = ihs.amount === null ? "" : ihs.amount;
-        $("visa-fee").value = C.VISA_FEE_OUTSIDE_GBP;
-      }
-
-      function money(n, currency) {
-        if (n === null || n === undefined) return "—";
-        var s = Math.round(n).toLocaleString("zh-Hant");
-        return currency === "GBP" ? "£" + Number(n).toLocaleString("en-GB") : "NT$" + s;
-      }
-
-      function currentInput() {
-        var key = $("preset").value;
-        var preset = C.PRESETS[key] || {
-          tuitionSource: null,
-          depositSource: null,
-          schoolZh: "自訂學程",
-          programZh: "",
-          school: "",
-          program: "",
-          intake: "",
-        };
-        var built = C.buildStudentFees({
-          tuitionGbp: $("tuition").value,
-          depositGbp: $("deposit").value,
-          courseLengthMonths: $("course-months").value,
-          livingMonthlyGbp: $("living-m").value,
-          livingMonths: $("living-months").value,
-          otherGbp: $("other-gbp").value,
-          twdExpenses: $("twd").value,
-          schoolInsuranceGbp: $("ins-amt").value,
-          schoolInsuranceFlag: $("ins-flag").value,
-          schoolInsuranceZeroEvidence: $("ins-evidence").checked,
-          tuitionSource: preset.tuitionSource,
-          depositSource: preset.depositSource,
-          tuitionAssumption: key === "custom",
-        });
-        var plan = C.calculatePlan({
-          fees: built.fees,
-          fxRate: $("fx").value,
-          reserveRate: $("reserve").value,
-          funds: {
-            savings: $("savings").value,
-            family: $("family").value,
-            scholarship: $("scholarship").value,
-          },
-          deposit: {
-            amount: $("deposit").value,
-            currency: "GBP",
-            paid: $("deposit-paid").checked,
-            partOfFeeId: "tuition",
-          },
-          loan: {
-            annualRate: $("rate").value,
-            termMonths: $("term").value,
-            graceMonths: $("grace").value,
-          },
-          incomeMonthly: $("income").value,
-          courseLengthMonths: $("course-months").value,
-        });
-        lastResult = plan;
-        lastMeta = { preset: key, school: preset, ihs: built.ihs };
-        return plan;
-      }
-
-      function render() {
-        updateAutoFees();
-        var plan = currentInput();
-        var banner = $("status-banner");
-        if (!plan.ok) {
-          banner.className = "banner";
-          banner.textContent = plan.error;
-          return;
-        }
-        if (plan.complete) {
-          banner.className = "banner ok";
-          banner.textContent = "必要費用都已有確定金額，下面的總額與缺口可以當作此假設下的完整試算。仍不是學校或銀行報價。";
-        } else {
-          banner.className = "banner";
-          banner.textContent = "還有待確認或衝突項目（常見是校方強制保險），所以「確定總額／確定缺口」必須是空的，不能用 0 或已知小計假裝算完。右側暫估僅供參考。";
-        }
-
-        var kpis = [];
-        kpis.push("<div class=\"kpi\"><span>已知小計（含預備金）</span><strong>" + money(plan.knownSubtotal) + "</strong></div>");
-        kpis.push("<div class=\"kpi alt\"><span>確定總額</span><strong>" + (plan.finalTotal === null ? "尚未確定" : money(plan.finalTotal)) + "</strong></div>");
-        kpis.push("<div class=\"kpi alt\"><span>確定缺口</span><strong>" + (plan.confirmedGap === null ? "尚未確定" : money(plan.confirmedGap)) + "</strong></div>");
-        if (plan.complete) {
-          kpis.push("<div class=\"kpi\"><span>建議貸款（上取整萬，假設）</span><strong>" + money(plan.loanAmount) + "</strong></div>");
-        } else {
-          kpis.push("<div class=\"kpi warn\"><span>暫估總額（非正式）</span><strong>" + money(plan.reference.total) + "</strong></div>");
-        }
-        $("kpis").innerHTML = kpis.join("");
-
-        var extra = "";
-        if (plan.deposit) {
-          extra += "<p class=\"muted\">待付學費餘額 " + money(plan.deposit.balanceDue, "GBP") + "（訂金 " + (plan.deposit.paid ? "已付" : "未付") + "）。總學費不因訂金改變。</p>";
-        }
-        if (plan.complete && plan.monthlyPayment !== null) {
-          extra += "<p class=\"muted\">假設年利率 " + (plan.annualRate * 100).toFixed(2) + "%、" + plan.termMonths + " 期，估月付 " + money(plan.monthlyPayment) + (plan.incomeMonthly ? "，負擔比 " + plan.burdenPercent + "%" : "") + "。不保證核貸。</p>";
-        } else if (plan.reference && plan.reference.loan !== null) {
-          extra += "<p class=\"muted\">若只看已知名目，暫估缺口 " + money(plan.reference.gap) + "，暫估貸款 " + money(plan.reference.loan) + (plan.reference.monthlyPayment !== null ? "，暫估月付 " + money(plan.reference.monthlyPayment) : "") + "。這不是確定值。</p>";
-        }
-
-        var rows = plan.lines.map(function (line) {
-          var tag = line.assumption ? "<span class=\"tag assumption\">假設</span>" : "<span class=\"tag sourced\">有來源</span>";
-          if (line.inclusion === "pending") tag += "<span class=\"tag pending\">待確認</span>";
-          if (line.inclusion === "included") tag += "<span class=\"tag included\">已含</span>";
-          var amt = line.amount === null ? "null" : (line.currency === "GBP" ? money(line.amount, "GBP") : money(line.amount));
-          var src = line.sourceUrl ? "<div class=\"src\"><a href=\"" + line.sourceUrl + "\" target=\"_blank\" rel=\"noopener\">" + (line.source || line.sourceUrl) + "</a></div>" : (line.note ? "<div class=\"src\">" + line.note + "</div>" : "");
-          return "<tr><td>" + line.name + "<br>" + tag + src + "</td><td class=\"num\">" + amt + "</td><td class=\"num\">" + (line.contributeTwd === null ? "不計入" : money(line.contributeTwd)) + "</td></tr>";
-        }).join("");
-        $("fee-table").innerHTML = "<table><thead><tr><th>項目</th><th>金額</th><th>計入成本（未含預備金）</th></tr></thead><tbody>" + rows + "</tbody></table>" + extra;
-
-        var handoff = {
-          module: "C",
-          version: "c-mvp-20261112",
-          complete: plan.complete,
-          school: lastMeta.school.school || "custom",
-          program: lastMeta.school.program || "custom",
-          intake: lastMeta.school.intake || "",
-          currency_out: "TWD",
-          known_subtotal_twd: plan.knownSubtotal,
-          final_total_twd: plan.finalTotal,
-          confirmed_gap_twd: plan.confirmedGap,
-          available_funds_twd: plan.available,
-          loan_amount_twd: plan.loanAmount,
-          monthly_payment_twd: plan.monthlyPayment,
-          burden_percent: plan.burdenPercent,
-          deposit: plan.deposit,
-          fx_rate: plan.fxRate,
-          reserve_rate: plan.reserveRate,
-          warnings: plan.warnings,
-          reference_only: plan.reference,
-          disclaimer: "課堂模擬，非正式放行；不保證核貸。",
-        };
-        $("json-out").textContent = JSON.stringify(handoff, null, 2);
-
-        $("pay-panel").innerHTML =
-          "<p><b>目前待付學費餘額：</b> " + (plan.deposit ? money(plan.deposit.balanceDue, "GBP") : "尚未計算") + "</p>" +
-          "<p>格拉斯哥：自 2025-03-01 起不接受學生直接銀行轉帳，須走校方核准管道（Convera 平台、MyCampus 卡付，以及有英國帳戶前提的 Direct Debit）。來源：<a href=\"https://www.gla.ac.uk/myglasgow/students/payingyourfees/selffundedpaymentmethods/\" target=\"_blank\" rel=\"noopener\">校方自費生付款頁</a>，查閱 2026-11-10（D-20261110-d08h）。訂金走 Applicant Self Service 卡付，與學費管道分開。</p>" +
-          "<p>愛丁堡：財務 FAQ 寫不提供銀行帳號、改用 Flywire，另列 Convera。來源見 B-20261110-k7m2。</p>" +
-          "<p class=\"muted\">各管道實際手續費、匯率加碼與臺灣可用方式尚未取得可引用報價，本頁不排名、不填假數字。此區待 D 模組補上有來源的比價。</p>";
-
-        var sources = Object.keys(C.SOURCES).map(function (k) {
-          var s = C.SOURCES[k];
-          return "<li><a href=\"" + s.url + "\" target=\"_blank\" rel=\"noopener\">" + s.label + "</a><div class=\"src\">" + s.note + "</div></li>";
-        }).join("");
-        $("source-panel").innerHTML = "<h3>已引用來源</h3><ul class=\"list\">" + sources + "</ul>";
-        $("open-panel").innerHTML = "<h3>未決事項</h3><ul class=\"list muted\"><li>校方強制保險：兩校示例皆待確認，故正式總額通常尚未確定。</li><li>匯率 41、預備金 5%、生活費、機票 55,000／60,000、貸款利率與期數皆為假設，55k／60k 尚未由組員選定。</li><li>C 實作已可跑，但正式 Demo 仍待協調者審查放行。</li><li>B 獎學金判定、D 支付費率、A 彙整介面尚未接入。</li></ul>";
-      }
-
-      ["preset","tuition","deposit","course-months","deposit-paid","living-m","living-months","other-gbp","twd","ins-flag","ins-amt","ins-evidence","fx","reserve","savings","family","scholarship","income","rate","term","grace"].forEach(function (id) {
-        var el = $(id);
-        el.addEventListener("input", render);
-        el.addEventListener("change", function () {
-          if (id === "preset") applyPreset();
-          render();
-        });
-      });
-
-      applyPreset();
-      render();
-      if (location.hash === "#cost") showPage("cost");
-    })();
-  </script>
+  <noscript>這個頁面需要 JavaScript 才能計算。請用瀏覽器打開，不要把待確認的費用當成 0。</noscript>
+  <script src="shared/contract.js"></script>
+  <script src="modules/c/engine.js"></script>
+  <script src="modules/b/programmes.js"></script>
+  <script src="modules/d/payments.js"></script>
+  <script src="modules/e/review.js"></script>
+  <script src="modules/a/aggregate.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
