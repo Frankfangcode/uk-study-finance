@@ -283,6 +283,67 @@
     return copy;
   }
 
+  function signed(n, formatter) {
+    if (n === null || n === undefined) return "";
+    if (n === 0) return "不變";
+    return (n > 0 ? "＋" : "−") + formatter(Math.abs(n));
+  }
+
+  // 情境模擬表。確定值只在 A.summarize（已套 E 審查）放行時才有；否則只列已知小計與可用資金的變化。
+  function scenarioSection(model) {
+    var shock = numOrNull($("fx-shock").value);
+    var head = '<article class="card" style="margin-top:12px"><h3>情境模擬</h3>' +
+      '<p class="fine">這是演練，不是預測：不猜匯率會怎麼走，也不猜獎學金會不會落空，只算「如果發生了，數字會變多少」，讓你先演練再決定。匯率、利率、期數都沿用左邊的假設，不保證核貸。</p>';
+    if (shock === null) {
+      return head + '<div class="banner bad">匯率變動幅度留空時先不模擬，不會默默當成 10%。</div></article>';
+    }
+    var programme = model.programme;
+    var funding = model.published.funding || {};
+    var awarded = [];
+    if ($("awarded").checked && programme.scholarships && programme.scholarships.length && funding.waiverTwd > 0) {
+      awarded.push({
+        id: programme.scholarships[0].id,
+        name: programme.scholarships[0].name,
+        amount: programme.scholarships[0].amount_gbp,
+        currency: "GBP",
+        countedTwd: funding.waiverTwd,
+      });
+    }
+    var sim = C.simulateScenarios(model.plan, {
+      fxShockPct: shock,
+      awardedScholarships: awarded,
+      reviewVerdict: model.summary.complete ? model.review.verdict : "未放行",
+    });
+    if (!sim.ok) return head + '<div class="banner bad">' + esc(sim.error) + "</div></article>";
+
+    function cell(value, delta, isBase) {
+      if (value === null) return '<td class="num">尚未確定</td>';
+      var change = isBase ? "" : '<div class="src">' + esc(signed(delta, money)) + "</div>";
+      return '<td class="num">' + money(value) + change + "</td>";
+    }
+    var rows = sim.scenarios.map(function (item) {
+      var isBase = item.id === "baseline";
+      var burden = item.burdenPercent === null ? "" : '<div class="src">負擔比 ' + esc(item.burdenPercent) + "%</div>";
+      var pay = item.monthlyPayment === null
+        ? '<td class="num">尚未確定</td>'
+        : '<td class="num">' + money(item.monthlyPayment) + (isBase ? "" : '<div class="src">' + esc(signed(item.delta.monthlyPayment, money)) + "</div>") + burden + "</td>";
+      return "<tr><td>" + esc(item.label) + '<div class="src">匯率 ' + esc(item.fxRate) + (item.scholarshipLost ? " · 獎學金不計入" : "") + "</div></td>" +
+        (sim.confirmed ? cell(item.finalTotal, item.delta.finalTotal, isBase) : cell(item.knownSubtotal, item.delta.knownSubtotal, isBase)) +
+        cell(item.available, item.delta.available, isBase) +
+        cell(item.confirmedGap, item.delta.confirmedGap, isBase) +
+        cell(item.loanAmount, item.delta.loanAmount, isBase) +
+        pay + "</tr>";
+    }).join("");
+    var status = sim.confirmed
+      ? '<div class="banner ok">必要費用都有金額、E 審查 PASS。下表是這組假設下的試算，每格第二行是與基準的差額。</div>'
+      : '<div class="banner"><span class="tag pending">尚未確定</span> ' + esc(sim.unconfirmedReason) + "下表的已知小計不是總成本，缺口、貸款、月付維持空白。</div>";
+    return head + status +
+      '<div style="overflow-x:auto"><table><thead><tr><th>情境</th><th class="num">' + (sim.confirmed ? "總成本（台幣）" : "已知小計（不是總成本）") +
+      '</th><th class="num">可用資金</th><th class="num">資金缺口</th><th class="num">建議貸款</th><th class="num">每月還款</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<p class="fine">' + esc(sim.scholarshipNote) + (sim.hasAwardedScholarship ? "「落空」只針對已勾選核定的減免；其他已入帳的獎學金不動。" : "") +
+      " 匯率變動幅度 " + esc(sim.fxShockPct) + "% 可在左邊調整。</p></article>";
+  }
+
   function renderA(model) {
     if (!model.ok) {
       $("page-a").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
@@ -419,6 +480,7 @@
       '<div class="kpi alt"><span>確定缺口</span><strong>' + (summary.confirmed_gap_twd === null ? "尚未確定" : money(summary.confirmed_gap_twd)) + "</strong></div>" +
       '<div class="kpi warn"><span>' + lastLabel + "</span><strong>" + lastValue + "</strong></div></div>" +
       '<article class="card"><h3>費用明細</h3><p class="fine">' + esc(depositLine) + "</p>" + loanLine + feeTable(plan) + "</article>" +
+      scenarioSection(model) +
       '<details class="card" style="margin-top:12px"><summary>' + jsonTitle + '</summary><pre class="json">' + esc(JSON.stringify(shown, null, 2)) + "</pre></details>" +
       '<p class="fine">IHS 說明：' + esc(ihs.reason || "") + "</p>";
     $("tuition-src").innerHTML = programme && programme._tuitionEdited
@@ -502,7 +564,7 @@
     if (action === "use-55k" || action === "use-60k") render();
   });
 
-  ["preset", "tuition", "deposit", "course-months", "deposit-paid", "living-m", "living-months", "other-gbp", "twd", "ins-flag", "ins-amt", "ins-evidence", "fx", "reserve", "awarded", "savings", "family", "scholarship", "income", "rate", "term", "grace"].forEach(function (id) {
+  ["preset", "tuition", "deposit", "course-months", "deposit-paid", "living-m", "living-months", "other-gbp", "twd", "ins-flag", "ins-amt", "ins-evidence", "fx", "reserve", "fx-shock", "awarded", "savings", "family", "scholarship", "income", "rate", "term", "grace"].forEach(function (id) {
     var el = $(id);
     el.addEventListener("input", render);
     el.addEventListener("change", function () {

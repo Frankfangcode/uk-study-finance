@@ -33,7 +33,16 @@ node tests/acceptance.js
 npm test
 ```
 
-`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑這兩支。
+`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。`tests/scenarios.js` 對 C 的情境模擬（匯率 ±、已核定獎學金落空、最壞情況）。它由 `tests/acceptance.js` 最後載入，所以跑驗收就會一併跑到；也可以單獨跑 `node tests/scenarios.js`。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑 `test-c-module.js` 和 `tests/acceptance.js`，情境測試跟著後者執行。
+
+## 情境模擬（C 頁）
+
+C 頁右邊的「情境模擬」表回答一個問題：英鎊兌台幣變動 10%，或已核定的獎學金落空時，還款壓力怎麼變。這是演練，不是預測。
+
+- 入口是 `CModule.simulateScenarios(plan, { fxShockPct, awardedScholarships, reviewVerdict })`，吃 `calculatePlan` 的輸出，不改原方案。
+- 情境：基準、英鎊 +N%、英鎊 −N%、已核定獎學金落空、最壞情況（英鎊 +N% 且落空）。N 預設 10，可在 C 頁調整；留空或 0 不會被當成 10。
+- 只有已核定的獎學金才有落空與最壞情況。未核定的本來就不計入資金。英鎊計價的減免，台幣價值跟著情境匯率重算。
+- 必要費用還有待確認，或 E 審查不是 PASS 時，每個情境的總成本、缺口、貸款、月付都是 null，畫面只列已知小計與可用資金的變化，並標「尚未確定」。
 
 ## 模組地圖
 
@@ -41,7 +50,7 @@ npm test
 | --- | --- | --- | --- |
 | A 彙整 | `#a` | `modules/a/aggregate.js`、`shared/contract.js` | 發布整案快照、學生彙整頁。只讀 C 同一個 `snapshot_id` |
 | B 選校與獎學金 | `#b` | `modules/b/programmes.js` | 格拉斯哥、愛丁堡示例：學費、訂金、獎學金 |
-| C 成本與貸款 | `#c` | `modules/c/engine.js` | 總成本、缺口、貸款、月付。根目錄 `engine.js` 只是相容入口 |
+| C 成本與貸款 | `#c` | `modules/c/engine.js` | 總成本、缺口、貸款、月付、情境模擬。根目錄 `engine.js` 只是相容入口 |
 | D 支付比較 | `#d` | `modules/d/payments.js` | 訂金與學費管道分開，用 C 的待付餘額。沒報價不排名 |
 | E 審查 | `#e` | `modules/e/review.js` | 來源、假設、待確認。未知不能當 0 |
 | 共用常數 | — | `shared/constants.js` | 每個已核對數字和網址 |

@@ -571,7 +571,150 @@
     return scenario;
   }
 
+  /**
+   * 情境模擬：匯率變動、已核定獎學金落空，以及兩者同時發生時，還款壓力怎麼變。
+   * 這是演練，不是預測。吃 calculatePlan 的輸出，不改原方案。
+   *
+   * opts.fxShockPct           匯率變動幅度（%），預設 10，必須大於 0 且小於 100。
+   * opts.awardedScholarships  已核定的獎學金：[{ name, amount, currency, countedTwd }]。
+   *                           未核定的不要放進來（本來就沒計入資金，也就沒有落空情境）。
+   *                           countedTwd 是基準方案已計入資金的台幣額；沒給就用 amount 換算。
+   * opts.reviewVerdict        E 審查結果。不是 "PASS"（含沒給）就不輸出確定值。
+   *
+   * 規則跟 calculatePlan 一樣：必要費用待確認時，確定總額、缺口、貸款、月付都是 null，
+   * 只有已知小計與可用資金的變化；未知金額不當 0。
+   */
+  var SCENARIO_FX_SHOCK_DEFAULT_PCT = 10;
+
+  function scholarshipTwd(amount, currency, fxRate) {
+    if (currency === "TWD" || currency === "NTD") return amount;
+    // 與 A.fundingCheck 相同：外幣減免換成台幣後取整到元。
+    return Math.round(amount * fxRate);
+  }
+
+  function diff(value, base) {
+    if (value === null || value === undefined || base === null || base === undefined) return null;
+    return round2(value - base);
+  }
+
+  function simulateScenarios(plan, opts) {
+    opts = opts || {};
+    if (!plan || plan.ok !== true) {
+      return { ok: false, error: (plan && plan.error) || "沒有可用的基準方案，無法做情境模擬。" };
+    }
+    var pct = opts.fxShockPct === undefined ? SCENARIO_FX_SHOCK_DEFAULT_PCT : asNum(opts.fxShockPct);
+    if (pct === null || pct <= 0 || pct >= 100) {
+      return { ok: false, error: "匯率變動幅度要填大於 0、小於 100 的百分比。留空或 0 不會被當成預設的 10%。" };
+    }
+    var baseFx = plan.fxRate;
+    var reserve = plan.reserveRate || 0;
+    var funds = plan.funds || { savings: 0, family: 0, scholarship: 0 };
+    var reviewPass = opts.reviewVerdict === "PASS";
+    var confirmed = !!plan.complete && reviewPass;
+
+    var awards = [];
+    (opts.awardedScholarships || []).forEach(function (item) {
+      var amount = asNum(item && item.amount);
+      if (amount === null || amount <= 0) return;
+      var currency = item.currency || "GBP";
+      var counted = asNum(item.countedTwd);
+      if (counted === null) counted = scholarshipTwd(amount, currency, baseFx);
+      awards.push({ id: item.id || null, name: item.name || "已核定獎學金", amount: amount, currency: currency, countedTwd: counted });
+    });
+    var countedTotal = awards.reduce(function (sum, item) { return sum + item.countedTwd; }, 0);
+    // 已核定額不可能超過基準已計入的獎學金；超過代表輸入對不上，不硬算。
+    if (countedTotal > (funds.scholarship || 0) + 0.005) {
+      return { ok: false, error: "已核定獎學金的台幣額超過基準方案計入的獎學金，兩邊對不上，先不模擬。" };
+    }
+    var hasAwarded = awards.length > 0;
+
+    function run(id, label, fxFactor, lost) {
+      var fx = Math.round(baseFx * fxFactor * 1e6) / 1e6;
+      var known = round2((plan.twdKnown + plan.gbpKnown * fx) * (1 + reserve));
+      var scholarship = (funds.scholarship || 0) - countedTotal;
+      if (!lost) {
+        awards.forEach(function (item) {
+          scholarship += fxFactor === 1 ? item.countedTwd : scholarshipTwd(item.amount, item.currency, fx);
+        });
+      }
+      var available = round2((funds.savings || 0) + (funds.family || 0) + scholarship);
+      var total = confirmed ? known : null;
+      var gap = confirmed ? round2(total - available) : null;
+      var loan = suggestLoan(gap);
+      var payment = loan === null || plan.annualRate === null || plan.termMonths === null
+        ? null
+        : monthlyPayment(loan, plan.annualRate, plan.termMonths);
+      var income = plan.incomeMonthly;
+      var burden = payment === null || income === null || income === undefined || income <= 0
+        ? null
+        : round2((payment / income) * 100);
+      return {
+        id: id,
+        label: label,
+        fxRate: fx,
+        scholarshipLost: !!lost,
+        confirmed: confirmed,
+        status: confirmed ? "確定" : "尚未確定",
+        knownSubtotal: known,
+        available: available,
+        scholarshipCounted: round2(scholarship),
+        finalTotal: total,
+        confirmedGap: gap,
+        loanAmount: loan,
+        monthlyPayment: payment,
+        burdenPercent: burden,
+      };
+    }
+
+    var pctText = String(pct);
+    var up = 1 + pct / 100;
+    var down = 1 - pct / 100;
+    var baseline = run("baseline", "基準（目前方案）", 1, false);
+    var list = [
+      baseline,
+      run("fx-up", "英鎊兌台幣 +" + pctText + "%", up, false),
+      run("fx-down", "英鎊兌台幣 −" + pctText + "%", down, false),
+    ];
+    if (hasAwarded) {
+      list.push(run("scholarship-lost", "已核定的獎學金落空", 1, true));
+      list.push(run("worst", "最壞情況：英鎊 +" + pctText + "% 且獎學金落空", up, true));
+    }
+    list.forEach(function (item) {
+      item.delta = {
+        knownSubtotal: diff(item.knownSubtotal, baseline.knownSubtotal),
+        available: diff(item.available, baseline.available),
+        finalTotal: diff(item.finalTotal, baseline.finalTotal),
+        confirmedGap: diff(item.confirmedGap, baseline.confirmedGap),
+        loanAmount: diff(item.loanAmount, baseline.loanAmount),
+        monthlyPayment: diff(item.monthlyPayment, baseline.monthlyPayment),
+        burdenPercent: diff(item.burdenPercent, baseline.burdenPercent),
+      };
+    });
+
+    var reason = null;
+    if (!plan.complete) reason = "還有待確認的必要費用，確定總額、缺口、貸款與月付都不輸出，只有已知小計的變化。";
+    else if (!reviewPass) reason = "E 審查不是 PASS，確定值不輸出，只有已知小計的變化。";
+
+    return {
+      ok: true,
+      kind: "演練，不是預測",
+      fxShockPct: pct,
+      baseFxRate: baseFx,
+      confirmed: confirmed,
+      status: confirmed ? "確定" : "尚未確定",
+      unconfirmedReason: reason,
+      hasAwardedScholarship: hasAwarded,
+      awardedScholarships: awards,
+      scholarshipNote: hasAwarded
+        ? "外幣計價的減免，台幣價值會跟著情境匯率重算。"
+        : "沒有已核定的獎學金，所以沒有「落空」與「最壞情況」；未核定的本來就不計入資金。",
+      scenarios: list,
+    };
+  }
+
   return {
+    simulateScenarios: simulateScenarios,
+    SCENARIO_FX_SHOCK_DEFAULT_PCT: SCENARIO_FX_SHOCK_DEFAULT_PCT,
     SOURCES: SOURCES,
     PRESETS: PRESETS,
     IHS_YEAR_GBP: IHS_YEAR_GBP,
