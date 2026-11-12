@@ -660,5 +660,227 @@ check("E 常數都帶網址；假設有標；待確認金額是 null；校方預
   assert.strictEqual(human.verdict, "轉真人");
 });
 
+check("C→E：plan.lines 帶 zeroEvidence，無此費用且有零費證據與來源時審查 PASS", function () {
+  publishCase.ws = null;
+  var pub = publishCase([
+    synth("tuition-01", 1, 1000000, "另計"),
+    synth("ins-01", 1, 0, "無此費用", { zero_evidence: true }),
+  ], "S-zero-review");
+  var line = pub.plan.lines.filter(function (item) { return item.id === "ins-01"; })[0];
+  assert.strictEqual(line.zeroEvidence, true);
+  var review = E.review({ lines: pub.plan.lines, scenario: pub.scenario });
+  assert.deepStrictEqual(review.blockers, []);
+  assert.strictEqual(review.verdict, "PASS");
+  var summary = A.summarize(pub, review);
+  assert.strictEqual(summary.final_total_twd, 1000000);
+  var noEvidence = E.review({
+    lines: pub.plan.lines.map(function (item) {
+      return item.id === "ins-01" ? Object.assign({}, item, { zeroEvidence: false }) : item;
+    }),
+    scenario: pub.scenario,
+  });
+  assert.strictEqual(noEvidence.verdict, "退修");
+  assert.ok(noEvidence.blockers.some(function (item) { return item.code === "zero-without-evidence"; }));
+});
+
+check("校保被契約拒收：留下真正的原因，改標待確認，不再只剩「必需費用不在清單內」", function () {
+  var blankZero = studentPlan("glasgow", { depositPaid: false, insurance: { flag: "none", amount: null, zeroEvidence: true } });
+  assert.strictEqual(blankZero.ok, true);
+  assert.strictEqual(blankZero.rejected.length, 1);
+  assert.strictEqual(blankZero.rejected[0].id, "school-insurance");
+  assert.ok(blankZero.rejected[0].reason.indexOf("無此費用的 amount 必須是 0") >= 0);
+  assert.ok(blankZero.warnings[0].indexOf("校方強制保險") >= 0);
+  var line = blankZero.plan.lines.filter(function (item) { return item.id === "school-insurance"; })[0];
+  assert.strictEqual(line.inclusion, "pending");
+  assert.strictEqual(line.amount, null);
+  assert.ok(line.note.indexOf("無此費用的 amount 必須是 0") >= 0);
+  assert.strictEqual(blankZero.scenario.complete, false);
+  assert.strictEqual(blankZero.scenario.final_total_twd, null);
+
+  var included = studentPlan("glasgow", { depositPaid: false, insurance: { flag: "included", amount: 300, zeroEvidence: false } });
+  assert.strictEqual(included.ok, true);
+  assert.ok(included.rejected[0].reason.indexOf("已含缺包含證據") >= 0);
+  assert.strictEqual(included.scenario.final_total_twd, null);
+
+  var fine = studentPlan("glasgow", { depositPaid: false });
+  assert.deepStrictEqual(fine.rejected, []);
+});
+
+check("攤還期數 0 或負數、預備金負數：引擎擋下，不回月付 0", function () {
+  function run(extra) {
+    return C.calculatePlan(Object.assign({
+      fxRate: 41,
+      reserveRate: 0.05,
+      fees: [{ id: "tuition", version: 1, amount: 32000, currency: "GBP", inclusion: "extra", required: true }],
+      funds: { savings: 0, family: 0, scholarship: 0 },
+      loan: { annualRate: 0.03, termMonths: 108, graceMonths: 0 },
+    }, extra));
+  }
+  assert.strictEqual(run({}).ok, true);
+  [0, -12].forEach(function (term) {
+    var bad = run({ loan: { annualRate: 0.03, termMonths: term, graceMonths: 0 } });
+    assert.strictEqual(bad.ok, false);
+    assert.ok(bad.error.indexOf("攤還期數") >= 0);
+    assert.strictEqual(bad.monthlyPayment, undefined);
+  });
+  var negative = run({ reserveRate: -0.05 });
+  assert.strictEqual(negative.ok, false);
+  assert.ok(negative.error.indexOf("預備金") >= 0);
+  assert.strictEqual(run({ reserveRate: 0 }).ok, true);
+  var viaA = studentPlan("glasgow", { assumptions: { loan: { annualRate: 0.03, termMonths: 0, graceMonths: 0 } } });
+  assert.strictEqual(viaA.plan.ok, false);
+});
+
+check("D channel()：物件沒有重複鍵，預設值仍在", function () {
+  var source = require("fs").readFileSync(require("path").join(__dirname, "../modules/d/payments.js"), "utf8");
+  var body = source.slice(source.indexOf("function channel(partial)"), source.indexOf("var GLASGOW"));
+  var keys = (body.match(/^\s{6}([a-z_]+):/gm) || []).map(function (item) { return item.trim().replace(":", ""); });
+  assert.ok(keys.length >= 15);
+  var seen = {};
+  keys.forEach(function (key) {
+    assert.ok(!seen[key], "重複鍵 " + key);
+    seen[key] = true;
+  });
+  var ch = D.compare({ school_id: "glasgow", fee_purpose: "tuition", amount_due: 1, currency: "GBP" }).channels[0];
+  ["school_acceptance", "payer_eligibility", "preconditions", "quote_status", "fixed_fee", "pct_fee", "min_fee", "max_fee",
+    "fx_spread", "fee_included_in_quote", "payer_total", "currency", "consulted", "source_url", "source_urls", "note", "record",
+    "channel_id", "fee_purpose", "name"].forEach(function (key) {
+    assert.ok(Object.prototype.hasOwnProperty.call(ch, key), key);
+  });
+  assert.strictEqual(ch.quote_status, "缺報價");
+  assert.strictEqual(ch.payer_total, null);
+  assert.deepStrictEqual(ch.preconditions, []);
+});
+
+var loadApp = require("./fake-dom.js").loadApp;
+
+function kpi(html, label) {
+  var m = new RegExp("<span>" + label + "</span><strong>([^<]*)</strong>").exec(html);
+  return m ? m[1] : null;
+}
+
+check("畫面 C 頁：E 不是 PASS 時不得出現確定總額、確定缺口、建議貸款", function () {
+  var app = loadApp();
+  // 無此費用＋勾零費證據＋金額 0：C 算得出完整總額，但沒有來源網址，E 退修。
+  app.set("deposit-paid", "unpaid");
+  app.set("ins-flag", "none");
+  app.set("ins-evidence", true);
+  app.set("ins-amt", "0");
+  var same = studentPlan("glasgow", { depositPaid: false, insurance: { flag: "none", amount: 0, zeroEvidence: true } });
+  assert.strictEqual(same.scenario.complete, true, "前提：C 的情境是完整的");
+  assert.ok(same.scenario.final_total_twd > 0);
+  var review = E.review({ lines: same.plan.lines, scenario: same.scenario });
+  assert.notStrictEqual(review.verdict, "PASS", "前提：E 沒有放行");
+  assert.ok(review.blockers.every(function (item) { return item.code !== "zero-without-evidence"; }), "零費證據有帶到 E");
+
+  var html = app.html("c-results");
+  assert.strictEqual(kpi(html, "確定總額"), "尚未確定");
+  assert.strictEqual(kpi(html, "確定缺口"), "尚未確定");
+  assert.strictEqual(kpi(html, "建議貸款（假設）"), "尚未確定");
+  var loan = same.scenario.loan_amount_twd;
+  var gap = same.scenario.confirmed_gap_twd;
+  assert.ok(loan > 0 && gap > 0);
+  [loan, gap].forEach(function (n) {
+    assert.ok(html.indexOf("NT$" + Math.round(n).toLocaleString("zh-Hant")) < 0, "不得顯示 " + n);
+    assert.ok(html.indexOf(String(n)) < 0, "JSON 也不得露出 " + n);
+  });
+  assert.ok(html.indexOf("估月付") < 0);
+  assert.ok(/final_total_twd&quot;: null/.test(html));
+  assert.ok(html.indexOf("退修") >= 0);
+  // A 頁同一套規則。
+  assert.ok(app.html("page-a").indexOf("<span>確定總額</span><strong>尚未確定</strong>") >= 0);
+});
+
+check("畫面 C 頁：預設待確認時沒有確定總額；已知小計照常顯示", function () {
+  var app = loadApp();
+  var html = app.html("c-results");
+  assert.strictEqual(kpi(html, "確定總額"), "尚未確定");
+  assert.strictEqual(kpi(html, "確定缺口"), "尚未確定");
+  assert.ok(/^NT\$/.test(kpi(html, "已知小計")));
+  assert.ok(/^NT\$/.test(kpi(html, "暫估總額")));
+  assert.ok(html.indexOf("交給 A 的情境 JSON") >= 0);
+});
+
+check("畫面：校保被契約拒收時顯示真正原因，頁面照常算已知小計", function () {
+  var app = loadApp();
+  app.set("ins-flag", "none");
+  app.set("ins-evidence", true);
+  var html = app.html("c-results");
+  assert.ok(html.indexOf("無此費用的 amount 必須是 0") >= 0);
+  assert.ok(html.indexOf("必需費用不在清單內") < 0);
+  assert.ok(/^NT\$/.test(kpi(html, "已知小計")));
+  assert.strictEqual(kpi(html, "確定總額"), "尚未確定");
+  assert.ok(app.html("page-a").indexOf("必需費用不在清單內") < 0);
+  assert.ok(app.html("page-a").indexOf("無此費用的 amount 必須是 0") >= 0);
+  app.set("ins-flag", "included");
+  app.set("ins-evidence", false);
+  app.set("ins-amt", "300");
+  assert.ok(app.html("c-results").indexOf("已含缺包含證據") >= 0);
+  app.set("ins-flag", "pending");
+  app.set("ins-amt", "");
+  assert.ok(app.html("c-results").indexOf("契約檢查拒收") < 0);
+});
+
+check("畫面 E 頁：比率顯示成百分比，不是 NT$0", function () {
+  var app = loadApp();
+  var html = app.html("page-e");
+  function cell(label) {
+    var at = html.indexOf(label);
+    assert.ok(at >= 0, label);
+    return /<td class="num">([^<]*)<\/td>/.exec(html.slice(at))[1];
+  }
+  assert.strictEqual(cell("臺銀個人網銀外匯匯出費率"), "0.05%");
+  assert.strictEqual(cell("預備金比例"), "5%");
+  assert.strictEqual(cell("貸款年利率示例"), "3%");
+  assert.strictEqual(cell("臺銀個人網銀外匯匯出最低費"), "NT$120");
+  assert.strictEqual(cell("IHS 學生年費"), "£776");
+  assert.ok(html.indexOf('<td class="num">NT$0</td>') < 0);
+  Constants.catalog.forEach(function (entry) {
+    if (entry.amount !== null && entry.amount > 0 && entry.amount < 1) assert.strictEqual(entry.unit, "比例", entry.id);
+  });
+});
+
+check("畫面：清空學費或訂金就先不算，不默默用公告價", function () {
+  var app = loadApp();
+  assert.strictEqual(app.value("tuition"), "34815");
+  app.set("tuition", "");
+  ["c-results", "page-a", "page-d"].forEach(function (id) {
+    assert.ok(app.html(id).indexOf("學費或訂金留空時先不算") >= 0, id);
+  });
+  assert.ok(app.html("c-results").indexOf("已知小計") < 0);
+  app.set("tuition", "34815");
+  assert.ok(app.html("c-results").indexOf("已知小計") >= 0);
+  app.set("deposit", "");
+  assert.ok(app.html("c-results").indexOf("學費或訂金留空時先不算") >= 0);
+  assert.ok(app.html("c-results").indexOf("已知小計") < 0);
+});
+
+check("畫面：攤還期數 0／負數、預備金負數被擋", function () {
+  var app = loadApp();
+  ["0", "-12"].forEach(function (term) {
+    app.set("term", term);
+    assert.ok(app.html("c-results").indexOf("攤還期數必須大於 0") >= 0, term);
+    assert.ok(app.html("c-results").indexOf("已知小計") < 0);
+  });
+  app.set("term", "108");
+  assert.ok(app.html("c-results").indexOf("已知小計") >= 0);
+  app.set("reserve", "-0.05");
+  assert.ok(app.html("c-results").indexOf("預備金比例不能是負數") >= 0);
+  assert.ok(app.html("c-results").indexOf("已知小計") < 0);
+  app.set("reserve", "0");
+  assert.ok(app.html("c-results").indexOf("已知小計") >= 0);
+});
+
+check("畫面 A 頁：「格拉斯哥直接匯校不接受」只在選格拉斯哥時顯示", function () {
+  var app = loadApp();
+  assert.ok(app.html("page-a").indexOf("格拉斯哥直接匯到學校是不接受") >= 0);
+  app.set("preset", "edinburgh");
+  assert.ok(app.html("page-a").indexOf("愛丁堡大學") >= 0);
+  assert.ok(app.html("page-a").indexOf("格拉斯哥直接匯") < 0);
+  assert.strictEqual(app.value("tuition"), "47680");
+  app.set("preset", "glasgow");
+  assert.ok(app.html("page-a").indexOf("格拉斯哥直接匯到學校是不接受") >= 0);
+});
+
 if (process.exitCode) console.error("\nAcceptance tests failed.");
 else console.log("\nAll " + passed + " acceptance tests passed.");

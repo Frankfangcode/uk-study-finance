@@ -255,6 +255,7 @@
       id: "reserve-rate",
       label: "預備金比例",
       amount: 0.05,
+      unit: "比例",
       note: "原稿公式：外幣換算加台幣支出之後再乘。組員尚未定案。",
     }),
     assumption({
@@ -283,6 +284,7 @@
       id: "loan-rate-example",
       label: "貸款年利率示例",
       amount: 0.03,
+      unit: "比例",
       note: "不是銀行報價。原稿月息與月付反推的利率彼此不同，不寫成官方利率。",
     }),
     assumption({

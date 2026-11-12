@@ -335,12 +335,31 @@
     var ws = createWorkspace();
     var snapshots = [];
     var rejected = [];
+    var rejectedDetail = [];
     built.fees.forEach(function (fee) {
       var normal = normalizeStudentFee(fee);
       var snap = feeFromEngine(normal, programme);
       var saved = ingest(ws, snap);
-      if (!saved.ok) rejected.push(saved.error);
-      else snapshots.push(snap);
+      if (saved.ok) {
+        snapshots.push(snap);
+        return;
+      }
+      // 契約拒收：把真正的原因留在這一列，金額撤成待確認，
+      // 不讓整案只剩「必需費用不在清單內」。
+      var name = normal.name || normal.id;
+      var detail = { id: normal.id, name: name, reason: saved.error, kept_as_pending: false };
+      rejected.push(name + "：" + saved.error);
+      rejectedDetail.push(detail);
+      var fallback = normalizeStudentFee(fee);
+      fallback.inclusion = "pending";
+      fallback.amount = null;
+      fallback.zeroEvidence = false;
+      fallback.note = "契約檢查拒收這一筆：" + saved.error + "。先標待確認，不計入總額。";
+      var fallbackSnap = feeFromEngine(fallback, programme);
+      if (ingest(ws, fallbackSnap).ok) {
+        detail.kept_as_pending = true;
+        snapshots.push(fallbackSnap);
+      }
     });
     if (!snapshots.length) return { ok: false, error: rejected.join(" ") || "沒有可發布的費用。" };
 
@@ -385,6 +404,10 @@
     };
     published.ihs = built.ihs;
     published.warnings = rejected;
+    published.rejected = rejectedDetail;
+    if (!published.ok && rejected.length) {
+      published.error = "契約檢查拒收：" + rejected.join("；") + "。" + (published.error ? "（" + published.error + "）" : "");
+    }
     return published;
   }
 

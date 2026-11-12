@@ -81,8 +81,11 @@
     var months = numOrNull($("course-months").value);
     var tuitionEdited = tuition !== null && tuition !== programme.tuition.amount;
     var depositEdited = deposit !== null && deposit !== programme.deposit.amount;
-    if (tuition !== null) programme.tuition.amount = tuition;
-    if (deposit !== null) programme.deposit.amount = deposit;
+    // 留空就是留空：不默默退回公告價，交給 currentCase 依「留空先不算」擋下。
+    programme._tuitionBlank = tuition === null;
+    programme._depositBlank = deposit === null;
+    programme.tuition.amount = tuition;
+    programme.deposit.amount = deposit;
     programme.course_length_months = months;
     if (tuitionEdited) {
       programme.tuition.source = { label: "自訂學費", url: "", assumption: true, consulted: "2026-11-12", note: "已改過公告學費。" };
@@ -97,6 +100,17 @@
 
   function currentCase() {
     var programme = readProgramme();
+    if (programme._tuitionBlank || programme._depositBlank) {
+      return { ok: false, error: "學費或訂金留空時先不算，避免把空白當成 0，也不會默默改用公告價。要用公告價請重新選一次學程。", programme: programme };
+    }
+    var reserveInput = numOrNull($("reserve").value);
+    if (reserveInput !== null && reserveInput < 0) {
+      return { ok: false, error: "預備金比例不能是負數。不留預備金請填 0。", programme: programme };
+    }
+    var termInput = numOrNull($("term").value);
+    if (termInput !== null && termInput <= 0) {
+      return { ok: false, error: "攤還期數必須大於 0。0 期或負數算不出月付。", programme: programme };
+    }
     var published = A.buildStudentPlan({
       programme: programme,
       depositPaid: paidValue(),
@@ -228,6 +242,47 @@
       '<p class="src">來源：' + link(ch.source_url, ch.source_url) + (ch.record ? " · " + esc(ch.record) : "") + "</p></article>";
   }
 
+  function findLine(plan, id) {
+    for (var i = 0; i < plan.lines.length; i++) if (plan.lines[i].id === id) return plan.lines[i];
+    return null;
+  }
+
+  // 只講目前選的這所學校。「格拉斯哥直接匯校不接受」只在選格拉斯哥時出現。
+  function refusedChannelText(model) {
+    if (model.programme.key !== "glasgow") return "";
+    var refused = model.tuitionPay.channels.some(function (ch) {
+      return ch.channel_id === "uog-direct-bank" && ch.school_acceptance === "不接受";
+    });
+    return refused ? "格拉斯哥直接匯到學校是不接受；" : "";
+  }
+
+  // 比率（unit 為「比例」）顯示成百分比，不能套台幣格式變成 NT$0。
+  function percent(n) {
+    var value = Number(n);
+    if (!isFinite(value)) return "—";
+    return parseFloat((value * 100).toFixed(4)) + "%";
+  }
+
+  function catalogValue(entry) {
+    if (entry.amount === null || entry.amount === undefined) return "null";
+    if (entry.unit === "比例") return percent(entry.amount);
+    if (entry.currency === "GBP") return money(entry.amount, "GBP");
+    if (entry.currency === "TWD") return money(entry.amount);
+    return esc(entry.amount);
+  }
+
+  // C 頁給人看的情境 JSON。E 沒放行時，確定值一律遮成 null。
+  function scenarioForDisplay(scenario, summary, review) {
+    if (summary.complete || !scenario.complete) return scenario;
+    var copy = JSON.parse(JSON.stringify(scenario));
+    copy.complete = false;
+    ["final_total_twd", "confirmed_gap_twd", "loan_amount_twd", "monthly_payment_twd", "grace_interest_monthly_twd", "burden_percent"].forEach(function (key) {
+      copy[key] = null;
+    });
+    copy.review_verdict = review.verdict;
+    return copy;
+  }
+
   function renderA(model) {
     if (!model.ok) {
       $("page-a").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
@@ -271,7 +326,7 @@
       '<article class="card" style="margin-top:16px"><h3>費用</h3>' + feeTable(model.plan) + "</article>" +
       '<article class="card" style="margin-top:16px"><h3>付不付得了</h3><p>學費管道比的是待付餘額 ' +
       (model.tuitionDue.amount === null ? "（尚未確認，不排名）" : money(model.tuitionDue.amount, "GBP")) +
-      "。格拉斯哥直接匯到學校是不接受；沒有報價的管道不產生最低價。" +
+      "。" + refusedChannelText(model) + "沒有報價的管道不產生最低價。" +
       ' <button class="btn secondary" type="button" data-page="d">看支付比較</button></p></article>';
   }
 
@@ -321,28 +376,50 @@
     }
     var plan = model.plan;
     var scenario = model.scenario;
-    var banner = scenario.complete && model.review.verdict === "PASS"
-      ? '<div class="banner ok">必要費用都有金額。下面的確定總額仍是這組假設下的試算，不是學校或銀行報價。正式 Demo 尚未放行。</div>'
-      : '<div class="banner">還有待確認項目（目前通常是校方保險），所以確定總額、確定缺口、建議貸款都空著。已知小計只供對照。</div>';
+    var review = model.review;
+    // 跟 A 頁一樣：確定值只從 A.summarize（已套 E 審查）拿，不直接讀 scenario。
+    var summary = model.summary;
+    var banner;
+    if (summary.complete) {
+      banner = '<div class="banner ok">必要費用都有金額。下面的確定總額仍是這組假設下的試算，不是學校或銀行報價。正式 Demo 尚未放行。</div>';
+    } else if (scenario.complete) {
+      var why = review.blockers.map(function (item) {
+        return esc(item.name) + "：" + esc(E.presentLine(findLine(plan, item.id) || {}).reason || item.code);
+      }).join("；");
+      banner = '<div class="' + verdictClass(review.verdict) + '">金額都填了，但 E 審查是「' + esc(review.verdict) + "」，所以確定總額、確定缺口、建議貸款都空著。" +
+        esc(review.note) + (why ? "原因：" + why : "") + "</div>";
+    } else {
+      banner = '<div class="banner">還有待確認項目（目前通常是校方保險），所以確定總額、確定缺口、建議貸款都空著。已知小計只供對照。</div>';
+    }
+    var rejectedNote = (model.published.rejected || []).map(function (item) {
+      return '<div class="banner bad">「' + esc(item.name) + "」被契約檢查拒收：" + esc(item.reason) + "。這一筆先當待確認，不計入總額；改好欄位就會重算。</div>";
+    }).join("");
     var depositLine = "待付學費餘額：";
     if (!plan.deposit || plan.deposit.balanceDue === null) depositLine += "尚未確認";
     else depositLine += money(plan.deposit.balanceDue, "GBP") + "（訂金" + (plan.deposit.paid ? "已付" : "未付") + "）。總學費不因訂金改變。";
     var loanLine = "";
-    if (scenario.complete && scenario.monthly_payment_twd !== null) {
+    if (summary.complete && summary.monthly_payment_twd !== null) {
       loanLine = '<p class="muted">假設年利率 ' + (plan.annualRate === null ? "—" : (plan.annualRate * 100).toFixed(2)) +
-        "%、" + esc(plan.termMonths) + " 期，估月付 " + money(plan.monthlyPayment) +
+        "%、" + esc(plan.termMonths) + " 期，估月付 " + money(summary.monthly_payment_twd) +
         (plan.burdenPercent === null ? "" : "，負擔比 " + plan.burdenPercent + "%") + "。不保證核貸。</p>";
-    } else if (scenario.reference_only) {
-      loanLine = '<p class="muted">若只看已知名目，暫估缺口 ' + money(scenario.reference_only.gap) + "，暫估貸款 " + money(scenario.reference_only.loan) + "。這不是確定值。</p>";
+    } else if (summary.reference_only) {
+      loanLine = '<p class="muted">若只看已知名目，暫估缺口 ' + money(summary.reference_only.gap) + "，暫估貸款 " + money(summary.reference_only.loan) + "。這不是確定值。</p>";
     }
-    $("c-results").innerHTML = banner +
-      '<div class="kpis"><div class="kpi"><span>已知小計</span><strong>' + money(scenario.known_subtotal_twd) + "</strong></div>" +
-      '<div class="kpi alt"><span>確定總額</span><strong>' + (scenario.final_total_twd === null ? "尚未確定" : money(scenario.final_total_twd)) + "</strong></div>" +
-      '<div class="kpi alt"><span>確定缺口</span><strong>' + (scenario.confirmed_gap_twd === null ? "尚未確定" : money(scenario.confirmed_gap_twd)) + "</strong></div>" +
-      '<div class="kpi warn"><span>' + (scenario.complete ? "建議貸款（假設）" : "暫估總額") + "</span><strong>" +
-      (scenario.complete ? money(scenario.loan_amount_twd) : money(scenario.reference_only && scenario.reference_only.total)) + "</strong></div></div>" +
+    var lastLabel = "建議貸款（假設）";
+    var lastValue = summary.loan_amount_twd === null ? "尚未確定" : money(summary.loan_amount_twd);
+    if (!summary.complete && summary.reference_only) {
+      lastLabel = "暫估總額";
+      lastValue = money(summary.reference_only.total);
+    }
+    var shown = scenarioForDisplay(scenario, summary, review);
+    var jsonTitle = shown === scenario ? "交給 A 的情境 JSON" : "情境 JSON（E 還沒放行，確定值先遮成 null）";
+    $("c-results").innerHTML = banner + rejectedNote +
+      '<div class="kpis"><div class="kpi"><span>已知小計</span><strong>' + money(summary.known_subtotal_twd) + "</strong></div>" +
+      '<div class="kpi alt"><span>確定總額</span><strong>' + (summary.final_total_twd === null ? "尚未確定" : money(summary.final_total_twd)) + "</strong></div>" +
+      '<div class="kpi alt"><span>確定缺口</span><strong>' + (summary.confirmed_gap_twd === null ? "尚未確定" : money(summary.confirmed_gap_twd)) + "</strong></div>" +
+      '<div class="kpi warn"><span>' + lastLabel + "</span><strong>" + lastValue + "</strong></div></div>" +
       '<article class="card"><h3>費用明細</h3><p class="fine">' + esc(depositLine) + "</p>" + loanLine + feeTable(plan) + "</article>" +
-      '<details class="card" style="margin-top:12px"><summary>交給 A 的情境 JSON</summary><pre class="json">' + esc(JSON.stringify(scenario, null, 2)) + "</pre></details>" +
+      '<details class="card" style="margin-top:12px"><summary>' + jsonTitle + '</summary><pre class="json">' + esc(JSON.stringify(shown, null, 2)) + "</pre></details>" +
       '<p class="fine">IHS 說明：' + esc(ihs.reason || "") + "</p>";
     $("tuition-src").innerHTML = programme && programme._tuitionEdited
       ? "你改過學費，這格改標假設，不再掛校方公布價。"
@@ -376,7 +453,7 @@
   function renderE(model) {
     var rows = Constants.catalog.map(function (entry) {
       var kind = entry.kind === "sourced" ? '<span class="tag sourced">有來源</span>' : entry.kind === "assumption" ? '<span class="tag assumption">假設</span>' : '<span class="tag pending">待確認</span>';
-      var amount = entry.amount === null || entry.amount === undefined ? "null" : (entry.currency === "GBP" ? money(entry.amount, "GBP") : entry.currency === "TWD" ? money(entry.amount) : esc(entry.amount));
+      var amount = catalogValue(entry);
       var url = entry.url ? link(entry.url, "開啟來源") : "—";
       return "<tr><td>" + esc(entry.label) + "<br>" + kind + '<div class="src">' + esc(entry.note || "") + "</div></td><td class=\"num\">" + amount + "</td><td>" + url + "</td></tr>";
     }).join("");

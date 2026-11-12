@@ -222,6 +222,13 @@
     var fxRate = asNum(input.fxRate);
     var reserveRate = asNum(input.reserveRate);
     if (reserveRate === null) reserveRate = 0;
+    if (reserveRate < 0) {
+      return { ok: false, error: "預備金比例不能是負數。不留預備金請填 0。" };
+    }
+    var termInput = asNum(input.loan && input.loan.termMonths);
+    if (termInput !== null && termInput <= 0) {
+      return { ok: false, error: "攤還期數必須大於 0。0 期或負數算不出月付，不能顯示成月付 0。" };
+    }
     var funds = input.funds || {};
     var savings = asNum(funds.savings) || 0;
     var family = asNum(funds.family) || 0;
@@ -270,6 +277,7 @@
         source: fee.source || "",
         sourceUrl: fee.sourceUrl || "",
         assumption: !!fee.assumption,
+        zeroEvidence: !!fee.zeroEvidence,
         note: fee.note || part.reason || "",
         conflict: !!fee._conflict,
       });
