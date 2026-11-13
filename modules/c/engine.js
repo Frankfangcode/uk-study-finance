@@ -278,6 +278,7 @@
         sourceUrl: fee.sourceUrl || "",
         assumption: !!fee.assumption,
         zeroEvidence: !!fee.zeroEvidence,
+        selfReported: !!fee.selfReported,
         note: fee.note || part.reason || "",
         conflict: !!fee._conflict,
       });
@@ -393,6 +394,31 @@
     },
   };
 
+  // 校保預設待確認。opts.schoolInsuranceSource 是學生自己向校方確認後填的來源
+  // （{ label, url }）；有填才會帶進來，並標成學生自報，不是本站查證。
+  function schoolInsuranceFee(opts) {
+    var fee = {
+      id: "school-insurance",
+      version: 1,
+      name: "校方強制保險",
+      amount: isBlank(opts.schoolInsuranceGbp) ? null : asNum(opts.schoolInsuranceGbp),
+      currency: "GBP",
+      inclusion: opts.schoolInsuranceFlag || "pending",
+      required: true,
+      zeroEvidence: !!opts.schoolInsuranceZeroEvidence,
+      assumption: false,
+      note: "格拉斯哥與愛丁堡目前都是待確認（D-20261110-d07g、B-20261110-k7m2），不能當 0。",
+    };
+    var src = opts.schoolInsuranceSource;
+    if (src && typeof src.label === "string" && src.label.trim()) {
+      fee.source = src.label.trim();
+      fee.sourceUrl = src.url || "";
+      fee.selfReported = true;
+      fee.note = "學生自報，非本站查證。本站查到的校方頁面仍沒有這筆費用的明文。";
+    }
+    return fee;
+  }
+
   function buildStudentFees(opts) {
     opts = opts || {};
     var ihs = ihsAmountGbp(opts.courseLengthMonths);
@@ -496,18 +522,7 @@
         assumption: true,
         note: "假設。專題原稿出現過 55,000 與 60,000 兩種寫法，組員尚未選定，本欄由使用者自填。",
       },
-      {
-        id: "school-insurance",
-        version: 1,
-        name: "校方強制保險",
-        amount: isBlank(opts.schoolInsuranceGbp) ? null : asNum(opts.schoolInsuranceGbp),
-        currency: "GBP",
-        inclusion: opts.schoolInsuranceFlag || "pending",
-        required: true,
-        zeroEvidence: !!opts.schoolInsuranceZeroEvidence,
-        assumption: false,
-        note: "格拉斯哥與愛丁堡目前都是待確認（D-20261110-d07g、B-20261110-k7m2），不能當 0。",
-      },
+      schoolInsuranceFee(opts),
     ];
     if (!isBlank(opts.commercialInsuranceTwd) && asNum(opts.commercialInsuranceTwd) > 0) {
       fees.push({

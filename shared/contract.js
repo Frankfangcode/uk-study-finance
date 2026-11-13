@@ -38,7 +38,9 @@
 
   function hasEvidence(fee) {
     var src = fee.source_ref || {};
-    return !!(src.url || src.assumption || fee.assumption || fee.zero_evidence);
+    // 學生自報（self_reported）要有說明文字才算有來源；畫面與 E 會另外標「非本站查證」。
+    var selfReported = !!(src.self_reported && typeof src.label === "string" && src.label.trim());
+    return !!(src.url || src.assumption || fee.assumption || fee.zero_evidence || selfReported);
   }
 
   function validateFeeSnapshot(fee) {

@@ -45,6 +45,14 @@
     return !!(line.assumption || (line.source_ref && line.source_ref.assumption));
   }
 
+  // 學生自己向校方確認後填的來源。算有來源，但一律另外標示，不當成本站查證。
+  function isSelfReported(line) {
+    var flagged = !!(line.selfReported || (line.source_ref && line.source_ref.self_reported));
+    if (!flagged) return false;
+    var text = line.source || (line.source_ref && line.source_ref.label) || "";
+    return typeof text === "string" && text.trim() !== "";
+  }
+
   function issuesFor(line) {
     var issues = [];
     var amount = line.amount;
@@ -54,7 +62,7 @@
       if (amount === 0) issues.push("unknown-as-zero");
     }
     var counts = isExtra(line) || (isNone(line) && (line.zeroEvidence || line.zero_evidence));
-    if (counts && amount !== null && amount !== undefined && !sourceUrl(line) && !isAssumption(line)) {
+    if (counts && amount !== null && amount !== undefined && !sourceUrl(line) && !isAssumption(line) && !isSelfReported(line)) {
       issues.push("unsourced");
     }
     Constants.rejected.forEach(function (item) {
@@ -76,7 +84,8 @@
         amount: line.amount,
         contributeTwd: line.contributeTwd,
         issues: [],
-        status: isPending(line) ? "待確認" : isAssumption(line) ? "假設" : sourceUrl(line) ? "有來源" : "待確認",
+        selfReported: isSelfReported(line),
+        status: isPending(line) ? "待確認" : isAssumption(line) ? "假設" : isSelfReported(line) ? "學生自報" : sourceUrl(line) ? "有來源" : "待確認",
       };
     }
     return {
@@ -117,6 +126,7 @@
     var blockers = [];
     var pending = [];
     var assumptions = [];
+    var selfReported = [];
     lines.forEach(function (line) {
       var issues = issuesFor(line);
       issues.forEach(function (code) {
@@ -124,6 +134,7 @@
       });
       if (isPending(line)) pending.push(lineId(line));
       if (isAssumption(line)) assumptions.push(lineId(line));
+      if (isSelfReported(line) && !isPending(line)) selfReported.push(lineId(line));
     });
     if (scenario.complete && pending.length) {
       blockers.push({ code: "false-complete", id: "scenario", name: "整案" });
@@ -150,6 +161,8 @@
       blockers: blockers,
       pending: pending,
       assumptions: assumptions,
+      self_reported: selfReported,
+      self_reported_note: selfReported.length ? "學生自報，非本站查證" : null,
       show_final_total: showFinal,
       final_total_twd: showFinal ? scenario.final_total_twd : null,
       confirmed_gap_twd: showFinal ? scenario.confirmed_gap_twd : null,

@@ -7,7 +7,8 @@
   var D = window.DModule;
   var E = window.EModule;
   var Constants = window.SharedConstants;
-  var pages = ["a", "b", "c", "d", "e"];
+  // g 是引導流程（modules/guided/flow.js 自己畫），放第一個，也是預設頁。
+  var pages = ["g", "a", "b", "c", "d", "e"];
 
   function $(id) { return document.getElementById(id); }
 
@@ -50,7 +51,7 @@
   }
 
   function showPage(name) {
-    if (pages.indexOf(name) < 0) name = "a";
+    if (pages.indexOf(name) < 0) name = "g";
     pages.forEach(function (page) {
       $("page-" + page).classList.toggle("hidden", page !== name);
     });
@@ -574,9 +575,9 @@
   });
 
   window.addEventListener("hashchange", function () {
-    showPage((location.hash || "#a").slice(1));
+    showPage((location.hash || "#g").slice(1));
   });
 
   applyOfficialNumbers();
-  showPage((location.hash || "#a").replace("#", "") || "a");
+  showPage((location.hash || "#g").replace("#", "") || "g");
 })();
