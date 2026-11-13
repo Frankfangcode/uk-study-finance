@@ -16,7 +16,18 @@
 python3 -m http.server 8080
 ```
 
-然後打開 `http://localhost:8080/#a`。五個分頁是 `#a`、`#b`、`#c`、`#d`、`#e`。
+然後打開 `http://localhost:8080/`。預設開在「引導流程」`#g`，原本五個模組分頁是 `#a`、`#b`、`#c`、`#d`、`#e`。
+
+## 引導流程（預設頁）
+
+給學生一步一步走完：個人資料 → 選校與待確認項目 → 成本計算 → 合規檢查。程式在 `modules/guided/flow.js`，只管步驟、欄位驗證和畫面；數字全部來自既有的 `A.buildStudentPlan`（內含 `C.calculatePlan`）、`C.simulateScenarios`、`E.review`、`A.summarize`。
+
+- 可以一次選多個學程，各自計算、各自審查。
+- 兩校的校方強制保險目前都是待確認。第 2 步的「待確認項目」讓學生自己選：(a) 已向校方確認無此費用、(b) 已確認金額、(c) 仍待確認。(a)、(b) 一定要填來源（網址或說明，例如校方回信），沒填就擋下、維持待確認。待確認不會被預設成 0。
+- 學生填的來源在結果和 E 審查裡一律標「學生自報，非本站查證」。E 的 `review` 會多回 `self_reported` 清單。
+- E 不是 PASS 時，總成本、缺口、貸款、月付一律顯示「尚未確定」，並列出還缺什麼、怎麼補。
+- 「一鍵填入示範用虛構個案」會填入虛構的個人資料與「示範：虛構來源」，每一步都有紅色虛線框標示是虛構示範，可以一鍵清除。
+- 資料只留在瀏覽器記憶體，重新整理就清空。
 
 ## 怎麼跑測試
 
@@ -33,7 +44,7 @@ node tests/acceptance.js
 npm test
 ```
 
-`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。`tests/scenarios.js` 對 C 的情境模擬（匯率 ±、已核定獎學金落空、最壞情況）。它由 `tests/acceptance.js` 最後載入，所以跑驗收就會一併跑到；也可以單獨跑 `node tests/scenarios.js`。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑 `test-c-module.js` 和 `tests/acceptance.js`，情境測試跟著後者執行。
+`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。`tests/scenarios.js` 對 C 的情境模擬（匯率 ±、已核定獎學金落空、最壞情況）。`tests/guided-flow.js` 對引導流程（待確認怎麼擋、學生自報怎麼標、示範個案、步驟切換）。後兩個由 `tests/acceptance.js` 最後載入，所以跑驗收就會一併跑到；也可以單獨跑 `node tests/scenarios.js`、`node tests/guided-flow.js`。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑 `test-c-module.js` 和 `tests/acceptance.js`，情境與引導流程測試跟著後者執行。
 
 ## 情境模擬（C 頁）
 
@@ -48,6 +59,7 @@ C 頁右邊的「情境模擬」表回答一個問題：英鎊兌台幣變動 10
 
 | 模組 | 頁面 | 程式 | 做什麼 |
 | --- | --- | --- | --- |
+| 引導流程 | `#g` | `modules/guided/flow.js` | 四個步驟的學生流程。不自己算數字，只呼叫 A／B／C／E |
 | A 彙整 | `#a` | `modules/a/aggregate.js`、`shared/contract.js` | 發布整案快照、學生彙整頁。只讀 C 同一個 `snapshot_id` |
 | B 選校與獎學金 | `#b` | `modules/b/programmes.js` | 格拉斯哥、愛丁堡示例：學費、訂金、獎學金 |
 | C 成本與貸款 | `#c` | `modules/c/engine.js` | 總成本、缺口、貸款、月付、情境模擬。根目錄 `engine.js` 只是相容入口 |

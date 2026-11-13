@@ -14,7 +14,8 @@
       <div class="scope">網站模擬 · 先只做英國 · 不保證核貸</div>
     </div>
     <nav aria-label="模組">
-      <button class="nav-btn" type="button" data-page="a" aria-current="page">彙整（A）</button>
+      <button class="nav-btn" type="button" data-page="g" aria-current="page">引導流程</button>
+      <button class="nav-btn" type="button" data-page="a">彙整（A）</button>
       <button class="nav-btn" type="button" data-page="b">選校與獎學金（B）</button>
       <button class="nav-btn" type="button" data-page="c">成本與貸款（C）</button>
       <button class="nav-btn" type="button" data-page="d">支付比較（D）</button>
@@ -22,7 +23,10 @@
     </nav>
   </header>
   <main>
-    <section id="page-a"></section>
+    <section id="page-g">
+      <div id="g-root"></div>
+    </section>
+    <section id="page-a" class="hidden"></section>
     <section id="page-b" class="hidden"></section>
     <section id="page-c" class="hidden">
       <div class="kicker">模組 C · 方澤享實作，陳愛愛可補驗收</div>
@@ -205,6 +209,7 @@
   <script src="modules/d/payments.js"></script>
   <script src="modules/a/aggregate.js"></script>
   <script src="modules/e/review.js"></script>
+  <script src="modules/guided/flow.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

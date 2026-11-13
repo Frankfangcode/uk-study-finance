@@ -888,3 +888,7 @@ else console.log("\nAll " + passed + " acceptance tests passed.");
 // C 情境模擬的驗收在 tests/scenarios.js。從這裡載入，CI 的 Acceptance tests 步驟就會一併跑到。
 console.log("");
 require("./scenarios.js");
+
+// 引導流程的驗收在 tests/guided-flow.js，同樣從這裡載入。
+console.log("");
+require("./guided-flow.js");

@@ -170,6 +170,85 @@ footer {
   color: var(--muted);
   font-size: 12px;
 }
+/* 引導流程 */
+.g-stepper { list-style: none; display: flex; gap: 6px; padding: 0; margin: 10px 0 16px; overflow-x: auto; }
+.g-stepper li { flex: 1 0 auto; }
+.g-step {
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+.g-step.done { color: var(--green); border-color: #b7d0c3; }
+.g-step.current { background: var(--green); color: #f6f1e7; border-color: var(--green); font-weight: 700; }
+.g-step-n {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.g-step.current .g-step-n { background: rgba(255, 255, 255, 0.22); }
+.g-demo {
+  border: 2px dashed var(--warn);
+  background: repeating-linear-gradient(135deg, #fdecec, #fdecec 12px, #fff6f2 12px, #fff6f2 24px);
+  color: #5a1f1f;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+  font-family: "Avenir Next", "PingFang TC", sans-serif;
+  font-size: 14px;
+}
+.g-demo .btn { margin-top: 8px; background: #fff; }
+.g-demo-offer { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 14px; }
+.g-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+.g-error { color: var(--warn); font-size: 12px; font-family: "Avenir Next", "PingFang TC", sans-serif; }
+input[aria-invalid="true"] { border-color: var(--warn); }
+textarea {
+  border: 1px solid #cfc6b8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+  resize: vertical;
+  font-family: "Avenir Next", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+}
+textarea:focus { outline: 2px solid #b7d0c3; border-color: var(--green-2); }
+.g-choice, .g-pick { display: block; font-size: 14px; color: var(--ink); padding: 6px 0; cursor: pointer; }
+.g-choice input, .g-pick input { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; }
+.g-pick { font-size: 16px; }
+.g-choices { margin: 8px 0; }
+.g-pending, .g-result { margin-bottom: 14px; }
+.g-section { margin-top: 22px; }
+.g-mini { margin: 8px 0; }
+.g-scroll { overflow-x: auto; }
+.g-shock { max-width: 320px; }
+.g-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
+.g-nav .btn, .g-pending .btn, .g-demo-offer .btn { min-height: 44px; padding: 10px 18px; font-size: 14px; }
+.g-result h4 { margin: 16px 0 6px; font-size: 14px; }
+.g-result .kpis { grid-template-columns: repeat(4, 1fr); }
+.tag.self { color: #5a2d82; background: #f3ecfa; border-color: #cdb6e4; }
+.kpi .tag { margin-top: 6px; }
+@media (max-width: 900px) {
+  .g-fields { display: block; }
+  .g-result .kpis { display: grid; grid-template-columns: 1fr 1fr; }
+  .g-step { padding: 8px 10px; }
+  .g-nav .btn { flex: 1 1 0; }
+}
 @media (max-width: 900px) {
   .grid-2, .grid-3, form.calc, .field.row, .kpis, .brand { display: block; }
   .card, fieldset, .channel { margin-bottom: 12px; }

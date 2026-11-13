@@ -72,6 +72,7 @@
       source: (fee.source_ref && (fee.source_ref.label || fee.source_ref.url)) || "",
       sourceUrl: (fee.source_ref && fee.source_ref.url) || "",
       assumption: !!(fee.assumption || (fee.source_ref && fee.source_ref.assumption)),
+      selfReported: !!(fee.source_ref && fee.source_ref.self_reported),
       note: fee.note || (fee.source_ref && fee.source_ref.note) || "",
     };
   }
@@ -235,8 +236,11 @@
       source: fee.source,
       sourceUrl: fee.sourceUrl,
       assumption: fee.assumption,
+      selfReported: !!fee.selfReported,
       note: fee.note || "",
     };
+    // 學生自報必須真的有來源說明，否則不算自報，照沒有來源處理。
+    if (copy.selfReported && !(typeof copy.source === "string" && copy.source.trim())) copy.selfReported = false;
     if (copy.inclusion === "none" && !copy.zeroEvidence) {
       copy.inclusion = "pending";
       copy.amount = null;
@@ -248,7 +252,7 @@
       copy.amount = null;
       return copy;
     }
-    if (copy.inclusion === "extra" && !copy.assumption && !copy.sourceUrl) {
+    if (copy.inclusion === "extra" && !copy.assumption && !copy.sourceUrl && !copy.selfReported) {
       copy.inclusion = "pending";
       copy.amount = null;
       copy.note += " 沒有來源，不能當成確定金額。";
@@ -271,6 +275,7 @@
       note: fee.note || "",
       consulted: Constants.CONSULTED,
     };
+    if (fee.selfReported) source.self_reported = true;
     return {
       fee_id: fee.id,
       item_version: fee.version || 1,
@@ -312,6 +317,7 @@
       schoolInsuranceGbp: (insurance.flag || "pending") === "pending" ? null : insurance.amount,
       schoolInsuranceFlag: insurance.flag || "pending",
       schoolInsuranceZeroEvidence: !!insurance.zeroEvidence,
+      schoolInsuranceSource: insurance.source || null,
       tuitionSource: {
         label: programme.tuition.source.label,
         url: programme.tuition.source.url,

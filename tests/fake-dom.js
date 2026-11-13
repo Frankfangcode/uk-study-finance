@@ -58,13 +58,16 @@ function parseElements(html) {
 function loadApp() {
   var html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
   var elements = parseElements(html);
+  var docListeners = {};
   var document = {
     getElementById: function (id) {
       if (!elements[id]) throw new Error("index.html 沒有 #" + id);
       return elements[id];
     },
     querySelectorAll: function () { return []; },
-    addEventListener: function () {},
+    addEventListener: function (type, fn) {
+      (docListeners[type] = docListeners[type] || []).push(fn);
+    },
   };
   var sandbox = {
     document: document,
@@ -80,9 +83,30 @@ function loadApp() {
     SharedConstants: require("../shared/constants.js"),
   };
   sandbox.window = sandbox;
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, "app.js"), "utf8"), sandbox, { filename: "app.js" });
+  vm.createContext(sandbox);
+  // 跟 index.html 一樣的順序：先引導流程，再 app.js。
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "modules/guided/flow.js"), "utf8"), sandbox, { filename: "modules/guided/flow.js" });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "app.js"), "utf8"), sandbox, { filename: "app.js" });
 
   return {
+    /**
+     * 對 document 送一個委派事件（引導流程的欄位是動態畫出來的，沒有固定 id）。
+     * attrs 是被操作元素的屬性，props 是 value／checked。
+     */
+    dispatch: function (type, attrs, props) {
+      attrs = attrs || {};
+      var target = Object.assign({ value: "", checked: false }, props || {});
+      target.getAttribute = function (name) {
+        return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : null;
+      };
+      target.closest = function (selector) {
+        var m = /^\[([\w-]+)\]$/.exec(selector);
+        return m && Object.prototype.hasOwnProperty.call(attrs, m[1]) ? target : null;
+      };
+      (docListeners[type] || []).forEach(function (fn) {
+        fn({ type: type, target: target, preventDefault: function () {} });
+      });
+    },
     /** 改一個欄位並觸發 change，跟使用者操作一樣會重畫。 */
     set: function (id, value) {
       var el = document.getElementById(id);
