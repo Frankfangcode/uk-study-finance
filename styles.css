@@ -171,6 +171,24 @@ footer {
   font-size: 12px;
 }
 /* 引導流程 */
+.subtabs { display: flex; gap: 6px; overflow-x: auto; margin: 10px 0 16px; border-bottom: 1px solid var(--line); }
+.subtab {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--green);
+  font-size: 14px;
+  cursor: pointer;
+}
+.subtab.current { background: var(--green); color: #f6f1e7; border-color: var(--green); font-weight: 700; }
+.d-calc { margin-bottom: 14px; }
+.d-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 14px; }
+.d-sub { margin: 22px 0 10px; }
+@media (max-width: 720px) { .d-fields { grid-template-columns: 1fr; } }
 .g-stepper { list-style: none; display: flex; gap: 6px; padding: 0; margin: 10px 0 16px; overflow-x: auto; }
 .g-stepper li { flex: 1 0 auto; }
 .g-step {
