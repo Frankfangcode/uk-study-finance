@@ -613,7 +613,10 @@
       '<div class="field g-shock"><label for="g-fxShockPct">情境模擬：匯率變動幅度（%）<span class="tag assumption">演練</span></label>' +
       '<input id="g-fxShockPct" type="number" inputmode="decimal" step="any" data-g-field="fxShockPct" data-g-rerender="1" value="' + esc(state.profile.fxShockPct) + '" />' +
       '<div class="src">改完按 Tab 或點別處就會重算。預設 10%，是演練用的假設，不是匯率預測。</div></div>' +
-      overview(models) + models.map(resultCard).join("");
+      overview(models) + models.map(resultCard).join("") +
+      '<article class="card g-section"><h3>想比較怎麼付、怎麼帶錢？</h3>' +
+      '<p class="fine">D 頁可以用同一筆金額試算信用卡海外刷卡、外幣帳戶匯出的費用，並對照三種保險類型。僅供比較，非金融建議；不影響這一步的數字。</p>' +
+      '<div class="row-actions"><button class="btn secondary" type="button" data-page="d" data-d-tab="cards">看金融工具比較（D）</button></div></article>';
   }
 
   function reviewRows(model) {

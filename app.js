@@ -5,6 +5,7 @@
   var B = window.BModule;
   var C = window.CModule;
   var D = window.DModule;
+  var P = window.DProducts;
   var E = window.EModule;
   var Constants = window.SharedConstants;
   // g 是引導流程（modules/guided/flow.js 自己畫），放第一個，也是預設頁。
@@ -389,7 +390,7 @@
       '<article class="card" style="margin-top:16px"><h3>付不付得了</h3><p>學費管道比的是待付餘額 ' +
       (model.tuitionDue.amount === null ? "（尚未確認，不排名）" : money(model.tuitionDue.amount, "GBP")) +
       "。" + refusedChannelText(model) + "沒有報價的管道不產生最低價。" +
-      ' <button class="btn secondary" type="button" data-page="d">看支付比較</button></p></article>';
+      ' <button class="btn secondary" type="button" data-page="d" data-d-tab="pay">看支付比較</button></p></article>';
   }
 
   function renderB() {
@@ -492,14 +493,187 @@
       : "來源：" + link(programme.deposit.source.url, programme.deposit.source.label) + "。已含在學費裡。";
   }
 
+  // ---- D 頁子分頁：匯款／支付、信用卡、外幣帳戶、保險類型 ----
+  var D_TABS = [
+    { id: "pay", label: "匯款／支付" },
+    { id: "cards", label: "信用卡" },
+    { id: "fx", label: "外幣帳戶" },
+    { id: "insurance", label: "保險類型" },
+  ];
+  var fxAssumption = Constants.byId("fx-gbp-twd");
+  // 試算輸入留字串，跟 input.value 一樣；空白不會被偷偷補成預設值。
+  var dState = { tab: "pay", amountGbp: "30000", count: "1", fxRate: String(fxAssumption.amount) };
+
+  function dTabs() {
+    return '<div class="subtabs" role="tablist" aria-label="金融工具類別">' + D_TABS.map(function (tab) {
+      var on = tab.id === dState.tab;
+      return '<button type="button" role="tab" class="subtab' + (on ? " current" : "") + '" aria-selected="' + (on ? "true" : "false") +
+        '" data-d-tab="' + tab.id + '">' + esc(tab.label) + "</button>";
+    }).join("") + "</div>";
+  }
+
+  function dInput() {
+    return { amountGbp: numOrNull(dState.amountGbp), count: numOrNull(dState.count), fxRate: numOrNull(dState.fxRate) };
+  }
+
+  function dCalcForm() {
+    function field(id, label, hint) {
+      return '<div class="field"><label for="d-' + id + '">' + label + '</label><input id="d-' + id + '" type="number" inputmode="decimal" min="0" step="any" data-d-field="' + id +
+        '" value="' + esc(dState[id]) + '" />' + (hint ? '<div class="src">' + hint + "</div>" : "") + "</div>";
+    }
+    return '<article class="card d-calc"><h3>同條件試算</h3><div class="d-fields">' +
+      field("amountGbp", "每筆金額（GBP）", "例如學費 £30,000，或每月生活費。") +
+      field("count", "筆數", "學費一次付填 1；每月匯生活費填月數。") +
+      field("fxRate", '匯率 GBP→TWD <span class="tag assumption">假設</span>', "不是即時牌價，可以改。") +
+      '</div><p class="fine">改完按 Tab 或點別處就會重算。每個工具套同一組輸入，照資料順序列出，不排名、不選最划算。</p></article>';
+  }
+
+  function figTag(fig) {
+    return fig.value === null ? '<span class="tag pending">待確認</span>' : '<span class="tag sourced">有來源</span>';
+  }
+
+  function pctOrPending(fig) {
+    return fig.value === null ? '<span class="tag pending">待確認</span>' : esc(fig.value) + "%";
+  }
+
+  function twdOrPending(n) {
+    return n === null || n === undefined ? '<span class="tag pending">待確認</span>' : money(n);
+  }
+
+  function srcLine(fig) {
+    var where = fig.sourceUrl ? link(fig.sourceUrl, "來源") + " · 查閱 " + esc(fig.checkedAt) : "尚無來源";
+    return '<div class="src">' + esc(fig.note) + " " + where + "</div>";
+  }
+
+  function sourceList(urls, checkedAt) {
+    return '<p class="src">來源（查閱 ' + esc(checkedAt) + "）：" + urls.map(function (url) { return link(url, url); }).join(" · ") + "</p>";
+  }
+
+  function rewardTag(value) {
+    if (value === "適用") return '<span class="tag ok">適用</span>';
+    if (value === "不適用") return '<span class="tag bad">不適用</span>';
+    return '<span class="tag pending">待確認</span>';
+  }
+
+  function dDisclaimer() {
+    return '<div class="banner">' + esc(P.DISCLAIMER) + esc(P.ESTIMATE_NOTE) + "不排名，也不推薦特定產品。</div>";
+  }
+
+  function renderDCards() {
+    var input = dInput();
+    var base = P.normaliseInput(input);
+    var cards = P.cards();
+    var rows = cards.map(function (card) {
+      var est = P.estimateCard(card, input);
+      return "<tr><td><b>" + esc(card.issuer) + "</b><br>" + esc(card.name) + '</td><td class="num">' + pctOrPending(card.networkFeePct) +
+        '</td><td class="num">' + pctOrPending(card.bankFeePct) + '</td><td class="num">' + (est.feePct === null ? '<span class="tag pending">待確認</span>' : esc(est.feePct) + "%") +
+        '<div class="src">' + esc(est.feeBasis) + '</div></td><td class="num">' + (base.ok ? twdOrPending(est.feeTwd) : "—") + "</td></tr>";
+    }).join("");
+    var details = cards.map(function (card) {
+      return '<article class="card channel"><h3>' + esc(card.issuer) + "｜" + esc(card.name) + "</h3>" +
+        "<p>發卡組織費 " + pctOrPending(card.networkFeePct) + " " + figTag(card.networkFeePct) + "</p>" + srcLine(card.networkFeePct) +
+        "<p>銀行國外交易服務費 " + pctOrPending(card.bankFeePct) + " " + figTag(card.bankFeePct) + "</p>" + srcLine(card.bankFeePct) +
+        "<p>官方合計費率 " + pctOrPending(card.totalFeePct) + "</p>" + srcLine(card.totalFeePct) +
+        "<p>海外回饋 " + pctOrPending(card.rewardPct) + "（" + esc(card.rewardKind) + "）</p>" + srcLine(card.rewardPct) +
+        "<p>英國實體店消費回饋：" + rewardTag(card.ukInStoreReward) + esc(card.ukInStoreRewardNote) + "</p>" +
+        "<p>繳英國學費回饋：" + rewardTag(card.tuitionReward) + esc(card.tuitionRewardNote) + "</p>" +
+        '<p class="src">' + esc(card.note) + "</p>" + sourceList(card.sourceUrls, card.networkFeePct.checkedAt) + "</article>";
+    }).join("");
+    return dCalcForm() + (base.ok ? "" : '<div class="banner bad">' + esc(base.error) + "</div>") +
+      '<article class="card"><h3>海外刷卡手續費試算</h3><p class="fine">刷卡金額換算 ' + (base.ok ? money(base.totalTwd) : "—") +
+      "（" + esc(dState.amountGbp) + " GBP × " + esc(dState.count) + " 筆 × 匯率 " + esc(dState.fxRate) + "）。手續費＝發卡組織費＋銀行費。回饋另列，不拿來抵手續費。</p>" +
+      '<div class="g-scroll"><table><thead><tr><th>卡片</th><th class="num">發卡組織費</th><th class="num">銀行費</th><th class="num">試算費率</th><th class="num">估計手續費</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div><p class="fine">發卡組織的結匯匯率不是即時牌價，匯差不在表內。學校收不收信用卡、單筆上限多少，請看「匯款／支付」分頁，並先向發卡行確認額度。</p></article>' +
+      '<h3 class="d-sub">各卡費率、回饋與來源</h3><div class="grid-2">' + details + "</div>";
+  }
+
+  function handlingText(account) {
+    var h = account.handling;
+    if (h.type === "flat") return (h.amountTwd.value === null ? "待確認" : money(h.amountTwd.value) + "／筆");
+    if (h.type === "pct") {
+      if (h.pct.value === null) return "待確認";
+      return h.pct.value + "%，最低 " + (h.minTwd.value === null ? "待確認" : money(h.minTwd.value)) + "，最高 " + (h.maxTwd.value === null ? "待確認" : money(h.maxTwd.value));
+    }
+    return h.tiers.map(function (tier) {
+      return (tier.upToTwd === null ? "以上" : "≤" + money(tier.upToTwd)) + " " + (tier.feeTwd.value === null ? "待確認" : money(tier.feeTwd.value));
+    }).join("；");
+  }
+
+  function handlingFigures(account) {
+    var h = account.handling;
+    if (h.type === "flat") return [h.amountTwd];
+    if (h.type === "pct") return [h.pct, h.minTwd, h.maxTwd];
+    return h.tiers.map(function (tier) { return tier.feeTwd; });
+  }
+
+  function renderDFx() {
+    var input = dInput();
+    var base = P.normaliseInput(input);
+    var accounts = P.fxAccounts();
+    var rows = accounts.map(function (account) {
+      var est = P.estimateFxAccount(account, input);
+      var pending = est.pending.length ? '<div class="src">待確認：' + esc(est.pending.join("、")) + "</div>" : "";
+      var subtotal = est.feeTwd === null && est.knownSubtotalTwd !== null ? '<div class="src">已知小計 ' + money(est.knownSubtotalTwd) + "，不是總費用</div>" : "";
+      return "<tr><td><b>" + esc(account.provider) + "</b><br>" + esc(account.channel) + '</td><td class="num">' + (base.ok ? twdOrPending(est.handlingFeeTwd) : "—") +
+        '</td><td class="num">' + (base.ok ? twdOrPending(est.cableFeeTwd) : "—") + '</td><td class="num"><span class="tag pending">待確認</span></td><td class="num">' +
+        (base.ok ? twdOrPending(est.feeTwd) : "—") + subtotal + pending + "</td></tr>";
+    }).join("");
+    var details = accounts.map(function (account) {
+      var notes = handlingFigures(account).concat([account.cableFeeTwd, account.fullAmountExtraTwd, account.fxSpreadPct]).map(srcLine).join("");
+      return '<article class="card channel"><h3>' + esc(account.provider) + "｜" + esc(account.name) + "</h3>" +
+        '<p class="fine">' + esc(account.type) + " · " + esc(account.channel) + " · 可否從新臺幣使用：" + esc(account.availableFromTwd) + "</p>" +
+        "<p>手續費：" + esc(handlingText(account)) + "</p>" +
+        "<p>郵電費／匯出費：" + (account.cableFeeTwd.value === null ? '<span class="tag pending">待確認</span>' : money(account.cableFeeTwd.value) + "／筆") + "</p>" +
+        "<p>全額到行加收：" + (account.fullAmountExtraTwd.value === null ? '<span class="tag pending">待確認</span>' : money(account.fullAmountExtraTwd.value) + "／筆") +
+        (account.fullAmountCableFeeTwd ? "（全額到行郵電費 " + money(account.fullAmountCableFeeTwd.value) + "／筆）" : "") + "</p>" +
+        '<p>換匯點差：<span class="tag pending">待確認</span></p>' + notes +
+        '<p class="src">' + esc(account.note) + "</p>" + sourceList(account.sourceUrls, account.cableFeeTwd.checkedAt) + "</article>";
+    }).join("");
+    return dCalcForm() + (base.ok ? "" : '<div class="banner bad">' + esc(base.error) + "</div>") +
+      '<article class="card"><h3>外幣匯出費用試算</h3><p class="fine">每筆換算 ' + (base.ok ? money(base.perTransferTwd) : "—") + "，共 " + esc(dState.count) +
+      " 筆。估計費用＝（手續費＋郵電費）× 筆數，不含匯差、不含中間行與收款行內扣。缺任何一項就顯示待確認，不當成 0。</p>" +
+      '<div class="g-scroll"><table><thead><tr><th>帳戶／通路</th><th class="num">手續費</th><th class="num">郵電費</th><th class="num">換匯點差</th><th class="num">估計費用（不含匯差）</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div><p class="fine">這是把英鎊從台灣匯出去的銀行端費用。兩校都不收學生直接匯到學校帳戶（見「匯款／支付」分頁），所以這張表主要用在匯生活費到自己的英國帳戶。</p></article>' +
+      '<h3 class="d-sub">各帳戶費用與來源</h3><div class="grid-2">' + details + "</div>";
+  }
+
+  function renderDInsurance() {
+    var summary = P.insurance();
+    var names = {};
+    summary.lines.forEach(function (line) { names[line.id] = line.name; });
+    var rows = summary.lines.map(function (line) {
+      var amount = line.amount.value === null ? '<span class="tag pending">' + (line.id === "commercial" ? "不列報價" : "待確認") + "</span>"
+        : "£" + esc(line.amount.value) + "／年";
+      var overlap = line.mayOverlapWith.map(function (id) { return esc(names[id]); }).join("、");
+      return "<tr><td><b>" + esc(line.name) + '</b><br><span class="tag">' + esc(line.category) + "</span></td><td>" + esc(line.mandatory) + "</td><td>" + esc(line.collectedBy) +
+        "</td><td>" + amount + srcLine(line.amount) + "</td><td>" + line.covers.map(esc).join("；") + "</td><td>" + overlap + '<div class="src">' + esc(line.overlapNote) + "</div></td></tr>";
+    }).join("");
+    return '<div class="banner">' + esc(summary.disclaimer) + "</div>" +
+      '<div class="banner bad">不要把這三條線加成一個「保險費」。' + esc(summary.totalNote) + "</div>" +
+      '<article class="card"><h3>三條線對照</h3><div class="g-scroll"><table><thead><tr><th>類型</th><th>是否強制</th><th>誰收</th><th>金額</th><th>涵蓋</th><th>可能重複</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div><p class="fine">合計：不加總。這一頁沒有「保險總額」，也不會把任何一條帶進 C 的總成本；IHS 由 C 自己依簽證長度計算。</p></article>';
+  }
+
+  function renderDProducts() {
+    var body = dState.tab === "cards" ? renderDCards() : dState.tab === "fx" ? renderDFx() : renderDInsurance();
+    var titles = { cards: "信用卡海外刷卡", fx: "外幣帳戶與多幣別帳戶", insurance: "保險類型對照" };
+    $("page-d").innerHTML =
+      '<div class="kicker">模組 D · 方澤享 · 金融工具比較</div>' +
+      "<h2>" + titles[dState.tab] + "</h2>" + dTabs() + (dState.tab === "insurance" ? "" : dDisclaimer()) + body;
+  }
+
   function renderD(model) {
+    if (dState.tab !== "pay") {
+      renderDProducts();
+      return;
+    }
     if (!model.ok) {
-      $("page-d").innerHTML = '<div class="banner bad">' + esc(model.error) + "</div>";
+      $("page-d").innerHTML = dTabs() + '<div class="banner bad">' + esc(model.error) + "</div>";
       return;
     }
     var ref = model.tuitionPay.reference_only[0];
     $("page-d").innerHTML =
-      '<div class="kicker">模組 D · 方澤享 · 先看收不收，再看有沒有報價</div>' +
+      '<div class="kicker">模組 D · 方澤享 · 先看收不收，再看有沒有報價</div>' + dTabs() +
       "<h2>訂金和學費分開付</h2>" +
       '<p class="lede">比較用的是 C 算出的待付金額，不是把訂金再加進學費。沒有來源的手續費維持 null，這頁不選出最便宜的管道。</p>' +
       '<div class="banner">' + esc(model.tuitionPay.message) + "。最低成本：沒有。</div>" +
@@ -546,7 +720,31 @@
 
   $("calc-form").addEventListener("submit", function (event) { event.preventDefault(); });
 
+  // D 頁的試算欄位是動態畫的，用委派事件。change 才重畫，打字中不搶焦點。
+  document.addEventListener("input", function (event) {
+    var target = event.target;
+    var field = target && target.getAttribute ? target.getAttribute("data-d-field") : null;
+    if (field && Object.prototype.hasOwnProperty.call(dState, field)) dState[field] = target.value;
+  });
+  document.addEventListener("change", function (event) {
+    var target = event.target;
+    var field = target && target.getAttribute ? target.getAttribute("data-d-field") : null;
+    if (!field || !Object.prototype.hasOwnProperty.call(dState, field)) return;
+    dState[field] = target.value;
+    renderD(currentCase());
+  });
+
   document.addEventListener("click", function (event) {
+    var tabBtn = event.target.closest("[data-d-tab]");
+    if (tabBtn) {
+      var tab = tabBtn.getAttribute("data-d-tab");
+      if (D_TABS.some(function (item) { return item.id === tab; })) dState.tab = tab;
+      // 從引導流程的提示過來時，同一顆按鈕也帶 data-page，下面會切頁並重畫。
+      if (!tabBtn.getAttribute("data-page")) {
+        renderD(currentCase());
+        return;
+      }
+    }
     var pageBtn = event.target.closest("[data-page]");
     if (pageBtn && pageBtn.getAttribute("data-page")) {
       showPage(pageBtn.getAttribute("data-page"));

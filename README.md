@@ -44,7 +44,7 @@ node tests/acceptance.js
 npm test
 ```
 
-`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。`tests/scenarios.js` 對 C 的情境模擬（匯率 ±、已核定獎學金落空、最壞情況）。`tests/guided-flow.js` 對引導流程（待確認怎麼擋、學生自報怎麼標、示範個案、步驟切換）。後兩個由 `tests/acceptance.js` 最後載入，所以跑驗收就會一併跑到；也可以單獨跑 `node tests/scenarios.js`、`node tests/guided-flow.js`。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑 `test-c-module.js` 和 `tests/acceptance.js`，情境與引導流程測試跟著後者執行。
+`test-c-module.js` 是原本的 C 模組測試。`tests/acceptance.js` 對規格裡的驗收數字，以及 B／D／E 的交接。`tests/scenarios.js` 對 C 的情境模擬（匯率 ±、已核定獎學金落空、最壞情況）。`tests/guided-flow.js` 對引導流程（待確認怎麼擋、學生自報怎麼標、示範個案、步驟切換）。`tests/d-products.js` 對 D 的金融工具比較（數字都有來源、null 不當 0、信用卡與臺銀手續費試算、保險不加總）。後三個由 `tests/acceptance.js` 最後載入，所以跑驗收就會一併跑到；也可以單獨跑 `node tests/scenarios.js`、`node tests/guided-flow.js`、`node tests/d-products.js`。GitHub Actions（`.github/workflows/test.yml`）在 push 和 pull request 時跑 `test-c-module.js` 和 `tests/acceptance.js`，情境與引導流程測試跟著後者執行。
 
 ## 情境模擬（C 頁）
 
@@ -55,6 +55,17 @@ C 頁右邊的「情境模擬」表回答一個問題：英鎊兌台幣變動 10
 - 只有已核定的獎學金才有落空與最壞情況。未核定的本來就不計入資金。英鎊計價的減免，台幣價值跟著情境匯率重算。
 - 必要費用還有待確認，或 E 審查不是 PASS 時，每個情境的總成本、缺口、貸款、月付都是 null，畫面只列已知小計與可用資金的變化，並標「尚未確定」。
 
+## 金融工具比較（D 頁）
+
+D 頁有四個子分頁。「匯款／支付」是原本的學校付款管道；另外三個是給台灣學生的工具對照，僅供比較，非金融建議，不排名、不推薦產品。
+
+- **信用卡**（`modules/d/cards.js`）：各銀行的國外交易手續費，拆成發卡組織費與銀行費；海外回饋與學費是否適用另列，不拿來抵手續費。
+- **外幣帳戶**（`modules/d/fx-accounts.js`）：台灣銀行外幣匯出的手續費、郵電費，以及 Wise。換匯點差各家都沒有公開成固定比例，一律待確認。
+- **保險類型**（`modules/d/insurance.js`）：IHS、學校強制保險、選用商業保險三條線對照。不列保費報價，`summary().total` 固定是 null，不加總。
+- 試算在 `modules/d/products.js`：`estimateCard`、`estimateFxAccount`、`compare`。輸入每筆金額（GBP）、筆數、匯率（假設），每個工具套同一組輸入。結果是估計，非報價，不含匯差。
+- 每個數字是一個 figure：`{ value, unit, status, sourceUrl, checkedAt, note }`。有值就必須有官方來源網址與查閱日；查不到就是 `value: null`、`status: "待確認"`。null 不會被當成 0：缺任何必要費率，該工具的估計費用就是 null，畫面顯示待確認，最多列「已知小計」。
+- 新增或更新數字時，請實際打開官方頁面核對並更新 `checkedAt`，不要憑記憶填。`DProducts.auditFigures` 與 `tests/d-products.js` 會擋沒有來源的數字。
+
 ## 模組地圖
 
 | 模組 | 頁面 | 程式 | 做什麼 |
@@ -63,7 +74,7 @@ C 頁右邊的「情境模擬」表回答一個問題：英鎊兌台幣變動 10
 | A 彙整 | `#a` | `modules/a/aggregate.js`、`shared/contract.js` | 發布整案快照、學生彙整頁。只讀 C 同一個 `snapshot_id` |
 | B 選校與獎學金 | `#b` | `modules/b/programmes.js` | 格拉斯哥、愛丁堡示例：學費、訂金、獎學金 |
 | C 成本與貸款 | `#c` | `modules/c/engine.js` | 總成本、缺口、貸款、月付、情境模擬。根目錄 `engine.js` 只是相容入口 |
-| D 支付比較 | `#d` | `modules/d/payments.js` | 訂金與學費管道分開，用 C 的待付餘額。沒報價不排名 |
+| D 金融工具比較 | `#d` | `modules/d/payments.js`、`cards.js`、`fx-accounts.js`、`insurance.js`、`products.js` | 四個子分頁：匯款／支付（訂金與學費管道分開，用 C 的待付餘額）、信用卡、外幣帳戶、保險類型。沒報價不排名 |
 | E 審查 | `#e` | `modules/e/review.js` | 來源、假設、待確認。未知不能當 0 |
 | 共用常數 | — | `shared/constants.js` | 每個已核對數字和網址 |
 

@@ -892,3 +892,7 @@ require("./scenarios.js");
 // 引導流程的驗收在 tests/guided-flow.js，同樣從這裡載入。
 console.log("");
 require("./guided-flow.js");
+
+// D 金融工具比較（信用卡、外幣帳戶、保險類型）的驗收在 tests/d-products.js，最後載入。
+console.log("");
+require("./d-products.js");

@@ -79,6 +79,7 @@ function loadApp() {
     BModule: require("../modules/b/programmes.js"),
     CModule: require("../modules/c/engine.js"),
     DModule: require("../modules/d/payments.js"),
+    DProducts: require("../modules/d/products.js"),
     EModule: require("../modules/e/review.js"),
     SharedConstants: require("../shared/constants.js"),
   };
