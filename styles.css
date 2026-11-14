@@ -273,3 +273,10 @@ textarea:focus { outline: 2px solid #b7d0c3; border-color: var(--green-2); }
   .results { position: static; }
   h2 { font-size: 26px; }
 }
+
+/* AI 助理（試作） */
+.ai-notice { font-weight: 600; }
+.ai-card { margin-top: 16px; }
+.ai-card h4 { margin: 14px 0 6px; font-size: 14px; }
+.ai-summary p { margin: 0 0 8px; }
+.ai-data { max-height: 320px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-word; }

@@ -87,6 +87,11 @@ function loadApp() {
   vm.createContext(sandbox);
   // 跟 index.html 一樣的順序：先引導流程，再 app.js。
   vm.runInContext(fs.readFileSync(path.join(ROOT, "modules/guided/flow.js"), "utf8"), sandbox, { filename: "modules/guided/flow.js" });
+  // AI 助理（試作）的腳本，順序同 index.html。沙盒沒有 fetch、XMLHttpRequest、require，連不到外面。
+  ["base", "model", "profile-agent", "programme-agent", "cost-agent", "finance-agent", "compliance-agent", "coordinator", "ui"].forEach(function (name) {
+    var file = "agents/" + name + ".js";
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), "utf8"), sandbox, { filename: file });
+  });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "app.js"), "utf8"), sandbox, { filename: "app.js" });
 
   return {
@@ -118,6 +123,8 @@ function loadApp() {
     /** 真的 input.value 一律是字串，這裡照樣回字串。 */
     value: function (id) { return String(document.getElementById(id).value); },
     html: function (id) { return document.getElementById(id).innerHTML; },
+    /** 沙盒本身，測試用來確認頁面拿到的是哪些全域物件。 */
+    sandbox: sandbox,
   };
 }
 

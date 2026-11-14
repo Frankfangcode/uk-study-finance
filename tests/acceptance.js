@@ -893,6 +893,10 @@ require("./scenarios.js");
 console.log("");
 require("./guided-flow.js");
 
-// D 金融工具比較（信用卡、外幣帳戶、保險類型）的驗收在 tests/d-products.js，最後載入。
+// D 金融工具比較（信用卡、外幣帳戶、保險類型）的驗收在 tests/d-products.js。
 console.log("");
 require("./d-products.js");
+
+// AI Agent 層（模型層、五個 agent、協調者、AI 助理分頁）的驗收在 tests/agents.js，最後載入。
+console.log("");
+require("./agents.js");
