@@ -9,7 +9,8 @@
   var E = window.EModule;
   var Constants = window.SharedConstants;
   // g 是引導流程（modules/guided/flow.js 自己畫），放第一個，也是預設頁。
-  var pages = ["g", "a", "b", "c", "d", "e"];
+  // ai 是「AI 助理（試作）」（agents/ui.js 自己畫）。
+  var pages = ["g", "a", "b", "c", "d", "e", "ai"];
 
   function $(id) { return document.getElementById(id); }
 

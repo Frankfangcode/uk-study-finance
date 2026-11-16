@@ -20,6 +20,7 @@
       <button class="nav-btn" type="button" data-page="c">成本與貸款（C）</button>
       <button class="nav-btn" type="button" data-page="d">金融工具比較（D）</button>
       <button class="nav-btn" type="button" data-page="e">審查與來源（E）</button>
+      <button class="nav-btn" type="button" data-page="ai">AI 助理（試作）</button>
     </nav>
   </header>
   <main>
@@ -197,6 +198,12 @@
     </section>
     <section id="page-d" class="hidden"></section>
     <section id="page-e" class="hidden"></section>
+    <section id="page-ai" class="hidden">
+      <div class="kicker">AI 助理（試作） · 五個 agent 加協調者</div>
+      <h2>AI 助理（試作）</h2>
+      <p class="lede">目前為規則模板，不是即時 AI；數字全部來自模組計算。這一頁不會呼叫任何外部服務。</p>
+      <div id="ai-root"></div>
+    </section>
   </main>
   <footer>
     第八組「留學財務長 AI」課堂網站模擬。比較方案用，不構成錄取、簽證或貸款承諾。公布價查閱至 2026-11-12（台北時間），不是 2028 入學保證。正式 Demo 尚未放行。
@@ -214,6 +221,15 @@
   <script src="modules/a/aggregate.js"></script>
   <script src="modules/e/review.js"></script>
   <script src="modules/guided/flow.js"></script>
+  <script src="agents/base.js"></script>
+  <script src="agents/model.js"></script>
+  <script src="agents/profile-agent.js"></script>
+  <script src="agents/programme-agent.js"></script>
+  <script src="agents/cost-agent.js"></script>
+  <script src="agents/finance-agent.js"></script>
+  <script src="agents/compliance-agent.js"></script>
+  <script src="agents/coordinator.js"></script>
+  <script src="agents/ui.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
