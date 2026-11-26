@@ -163,6 +163,11 @@ check("第 2 步：列出 B 的每個學程，含學費、訂金與來源；沒�
     assert.ok(has(html, p.tuition.source.url.replace(/&/g, "&amp;")));
     assert.ok(has(html, p.deposit.source.url.replace(/&/g, "&amp;")));
   });
+  var funding = B.buildOutput("edinburgh").funding_reference;
+  assert.ok(has(html, funding.name));
+  assert.ok(has(html, funding.source.url));
+  assert.ok(has(html, funding.status));
+  assert.ok(!has(html, "我已獲核定 " + funding.name));
   ui.next();
   assert.strictEqual(ui.step(), 2);
   assert.ok(has(ui.html(), "請至少選一個學程"));
