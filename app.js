@@ -410,7 +410,13 @@
     var scholarships = programme.scholarships.length ? programme.scholarships.map(function (item) {
       return "<li><b>" + esc(item.name) + "</b> · " + esc(item.type) + " · " + money(item.amount_gbp, "GBP") + " · " + esc(item.year) +
         '<div class="src">' + link(item.source.url, "來源") + "</div><p class=\"fine\">" + esc(item.stack_note) + "</p></li>";
-    }).join("") : "<li>" + esc(programme.scholarship_note || "尚無已核對獎學金。") + "</li>";
+    }).join("") : "<li>目前沒有可勾選的校方減免。</li>";
+    var funding = programme.funding_reference;
+    if (funding) {
+      scholarships += "<li>" + esc(B.fundingReferenceText(funding)) + '<div class="src">' +
+        link(funding.source.url, funding.source.label) + "（查閱 " + esc(funding.source.consulted) + "） · " +
+        link(funding.eligibility_url, "申請資格") + "</div></li>";
+    }
     var lengthTag = programme.course_length_mapping === "假設" ? '<span class="tag assumption">假設</span>' : '<span class="tag sourced">學程頁</span>';
     $("page-b").innerHTML =
       '<div class="kicker">模組 B · 曾尉庭 · 學程、學費、訂金、獎學金</div>' +

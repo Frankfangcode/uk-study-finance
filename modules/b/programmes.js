@@ -133,9 +133,10 @@
           url: Constants.urls.edinburghProgramme,
           also: Constants.urls.edinburghDeposit,
           consulted: "2026-11-10",
-          published: "2026-10-06",
+          published: null,
+          also_published: "2026-10-06",
           record: "B-20261110-m4p1",
-          note: "原文 contributes towards your tuition fees。大學通則通常 £1,500，學院可另訂。",
+          note: "2027 入學學程頁列 £1,500、抵學費，未標發布日。補充來源是大學訂金通則，通則所列金額為一般情況，學院可另訂。",
         },
       },
       insurance: {
@@ -151,7 +152,21 @@
         },
       },
       scholarships: [],
-      scholarship_note: "這個示例還沒有收錄已核對的愛丁堡獎學金。不填 0，也不假設學生已獲獎。",
+      funding_reference: {
+        name: "Chevening Delta Climate Scholarship",
+        year: "2027/28",
+        application_deadline: "2026-10-06",
+        status: "已截止",
+        min_work_hours: 2800,
+        note: "台灣申請者的外部獎助。主辦方公告補助英國一年制碩士全額學費，須大學畢業滿兩年，並於返台後投入環境永續。個別課程資格由主辦方審核。",
+        source: {
+          label: "台達電子文教基金會公告",
+          url: "https://www.deefund.org/newsdetail/1815",
+          published: "2026-08-25",
+          consulted: "2026-11-23",
+        },
+        eligibility_url: "https://www.chevening.org/resource-hub/guidance/eligibility/",
+      },
       sponsor_rule: {
         status: "待確認",
         note: "愛丁堡贊助未付是否轉回學生，本示例沒有核到對應頁，留空。",
@@ -220,10 +235,17 @@
     });
   }
 
+  function fundingReferenceText(reference) {
+    return reference.name + "（" + reference.year + "）｜" + reference.status +
+      "，申請截止 " + reference.application_deadline + "。" + reference.note +
+      "畢業後須至少有 " + reference.min_work_hours.toLocaleString("en-GB") + " 小時工作經驗。本項資訊不計入試算。";
+  }
+
   return {
     list: list,
     buildOutput: buildOutput,
     awardState: awardState,
+    fundingReferenceText: fundingReferenceText,
     legacy: LEGACY,
   };
 });

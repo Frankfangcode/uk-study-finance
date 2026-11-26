@@ -72,8 +72,12 @@
           );
           pushSource(sources, school + " " + item.name, item.source);
         });
-      } else if (programme.scholarship_note) {
-        text.push(programme.scholarship_note);
+      }
+      var funding = programme.funding_reference;
+      if (funding) {
+        text.push(B.fundingReferenceText(funding));
+        pushSource(sources, funding.source.label, funding.source);
+        pushSource(sources, "Chevening 申請資格", { url: funding.eligibility_url, consulted: funding.source.consulted });
       }
 
       var insurance = programme.insurance || {};

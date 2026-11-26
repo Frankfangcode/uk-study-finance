@@ -522,6 +522,17 @@ check("未核定獎學金不進資金；核定的減免只扣一次，學費仍�
   assert.strictEqual(doubled.ok, false);
 });
 
+check("愛丁堡訂金來源日期分列，外部獎助資料不計入資金", function () {
+  var programme = B.buildOutput("edinburgh");
+  assert.strictEqual(programme.deposit.amount, 1500);
+  assert.strictEqual(programme.deposit.source.published, null);
+  assert.strictEqual(programme.deposit.source.also_published, "2026-10-06");
+  assert.strictEqual(programme.funding_reference.status, "已截止");
+  assert.strictEqual(programme.funding_reference.application_deadline, "2026-10-06");
+  assert.deepStrictEqual(B.awardState(programme, [programme.funding_reference.name]), []);
+  assert.strictEqual(studentPlan("edinburgh", { depositPaid: false }).scenario.funds.scholarship, 0);
+});
+
 check("D 格拉斯哥排除直接匯校；訂金與學費管道不同；沒有報價就不排名", function () {
   var tuition = D.compare({
     school_id: "glasgow",
