@@ -460,6 +460,12 @@
           esc(item.name) + "（" + money(item.amount_gbp, "GBP") + " " + esc(item.type) + "，只扣一次）</label>" +
           '<div class="src">沒勾就當未核定，不計入資金。' + link(item.source.url, "獎學金來源") + "</div>";
       }).join("");
+      var funding = p.funding_reference;
+      if (funding) {
+        awards += '<p class="fine">' + esc(B.fundingReferenceText(funding)) + " " +
+          link(funding.source.url, funding.source.label) + " · " +
+          link(funding.eligibility_url, "申請資格") + "</p>";
+      }
       return '<article class="card program' + (on ? " selected" : "") + '">' +
         '<label class="g-pick"><input type="checkbox" data-g-programme="' + esc(p.key) + '"' + (on ? " checked" : "") + " /> <b>" + schoolTitle(p) + "</b></label>" +
         "<div>" + esc(p.program_name) + " · 入學 " + esc(p.intake) + "</div>" +
